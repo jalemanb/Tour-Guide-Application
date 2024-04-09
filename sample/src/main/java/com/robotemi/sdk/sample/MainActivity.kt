@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.Dialog
+import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
 import android.content.IntentFilter
@@ -12,9 +13,17 @@ import android.content.pm.PackageManager
 import android.content.res.AssetFileDescriptor
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Camera
+import android.graphics.SurfaceTexture
+import android.hardware.camera2.CameraCaptureSession
+import android.hardware.camera2.CameraDevice
+import android.hardware.camera2.CameraManager
+import android.hardware.camera2.CaptureRequest
 import android.media.MediaPlayer
 import android.os.Bundle
 import android.os.Environment
+import android.os.Handler
+import android.os.HandlerThread
 import android.os.RemoteException
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
@@ -23,6 +32,8 @@ import android.util.Log
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.Surface
+import android.view.TextureView
 import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
@@ -120,6 +131,16 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
 
     val lock = Object()
 
+    lateinit var cameraManager: CameraManager
+    lateinit var textureView: TextureView
+    lateinit var cameraCaptureSession: CameraCaptureSession
+    lateinit var cameraDevice: CameraDevice
+    lateinit var captureRequest: CaptureRequest
+    lateinit var handler: Handler
+    lateinit var handlerThread: HandlerThread
+    lateinit var capReq: CaptureRequest.Builder
+
+
     @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -157,6 +178,92 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         debugReceiver = TemiBroadcastReceiver()
         registerReceiver(debugReceiver, IntentFilter(TemiBroadcastReceiver.ACTION_DEBUG))
         registerReceiver(assistantReceiver, IntentFilter(AssistantChangeReceiver.ACTION_ASSISTANT_SELECTION))
+
+        // CAMERA Permisssions
+        get_permissions()
+        // Start Camera Streaming
+        start_camera() // https://www.youtube.com/watch?v=S-7H72UTiBU
+
+    }
+    fun start_camera() {
+        textureView = findViewById(R.id.texture_view_cam)
+        cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
+        handlerThread = HandlerThread("videoThread")
+        handlerThread.start()
+        handler = Handler((handlerThread).looper)
+        textureView.surfaceTextureListener = object: TextureView.SurfaceTextureListener{
+            override fun onSurfaceTextureAvailable(p0: SurfaceTexture, p1: Int, p2: Int) {
+                open_camera()
+            }
+
+            override fun onSurfaceTextureSizeChanged(p0: SurfaceTexture, p1: Int, p2: Int) {
+            }
+
+            override fun onSurfaceTextureDestroyed(p0: SurfaceTexture): Boolean {
+                return false
+            }
+
+            override fun onSurfaceTextureUpdated(p0: SurfaceTexture) {
+            }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun open_camera() {
+        cameraManager.openCamera(this.cameraManager.cameraIdList[0], object: CameraDevice.StateCallback(){
+            override fun onOpened(p0: CameraDevice) {
+                cameraDevice = p0
+                capReq = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+                var surface = Surface(textureView.surfaceTexture)
+                capReq.addTarget(surface)
+                cameraDevice.createCaptureSession(listOf(surface), object: CameraCaptureSession.StateCallback(){
+                    override fun onConfigured(p0: CameraCaptureSession) {
+                        cameraCaptureSession = p0
+                        cameraCaptureSession.setRepeatingRequest(capReq.build(), null, null)
+                    }
+
+                    override fun onConfigureFailed(p0: CameraCaptureSession) {
+                        TODO("Not yet implemented")
+                    }
+                }, handler)
+
+            }
+
+            override fun onClosed(camera: CameraDevice) {
+            }
+
+            override fun onDisconnected(p0: CameraDevice) {
+            }
+
+            override fun onError(p0: CameraDevice, p1: Int) {
+            }
+        }, handler)
+    }
+
+    private fun get_permissions() {
+        var permissionsLst = mutableListOf<String>()
+
+        if (checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) permissionsLst.add(android.Manifest.permission.CAMERA)
+        if (checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) permissionsLst.add(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+        if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) permissionsLst.add(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+
+        if(permissionsLst.size > 0)
+        {
+            requestPermissions(permissionsLst.toTypedArray(), 101)
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        grantResults.forEach {
+            if (it != PackageManager.PERMISSION_GRANTED) {
+                get_permissions()
+            }
+        }
     }
 
     /**

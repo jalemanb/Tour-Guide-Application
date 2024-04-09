@@ -53,6 +53,11 @@
             android:textSize="54sp"
             tools:text="HOLA" />
 
+        <TextureView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:id="@+id/texture_view_cam"/>
+
     </RelativeLayout>
 
 
