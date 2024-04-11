@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" /> <!-- Use this permission on receiver to get the event when voice assistant is changed -->
     <uses-permission android:name="com.robotemi.permission.ASSISTANT" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
 
 

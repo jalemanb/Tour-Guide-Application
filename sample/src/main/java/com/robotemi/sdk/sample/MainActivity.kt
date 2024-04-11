@@ -47,6 +47,10 @@ import androidx.annotation.CheckResult
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import com.google.gson.Gson
+import com.neovisionaries.ws.client.WebSocket
+import com.neovisionaries.ws.client.WebSocketAdapter
+import com.neovisionaries.ws.client.WebSocketExtension
+import com.neovisionaries.ws.client.WebSocketFactory
 import com.robotemi.sdk.*
 import com.robotemi.sdk.Robot.*
 import com.robotemi.sdk.Robot.Companion.getInstance
@@ -89,12 +93,27 @@ import kotlinx.android.synthetic.main.group_buttons.*
 import kotlinx.android.synthetic.main.group_map_and_movement.*
 import kotlinx.android.synthetic.main.group_resources.*
 import kotlinx.android.synthetic.main.group_settings_and_status.*
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Dispatchers.Default
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.util.*
+import java.util.concurrent.CancellationException
 import java.util.concurrent.Executors
 import javax.net.ssl.SSLEngineResult.Status
 import kotlin.concurrent.thread
@@ -129,7 +148,14 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
 
     private val assistantReceiver = AssistantChangeReceiver()
 
-    val lock = Object()
+    private var tour_job: Job? = null
+
+    val scope = CoroutineScope(Dispatchers.Default + CoroutineName("MyScope"))
+
+    val onGoToChannel = Channel<Int>()
+    val onSpeakChannel = Channel<Int>()
+
+
 
     lateinit var cameraManager: CameraManager
     lateinit var textureView: TextureView
@@ -184,7 +210,36 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         // Start Camera Streaming
         start_camera() // https://www.youtube.com/watch?v=S-7H72UTiBU
 
+        // Enable start tour button assuming the robot start on idle state
+        // Disable stop tour button assuming the root is already stopped at the beginning
+        button_start_tour.isEnabled = true
+        button_start_tour.isClickable = true
+        button_stop_tour.isEnabled = false
+        button_stop_tour.isClickable = false
+
+        val serverUri = "ws://10.42.0.1:8765"
+        val ws = WebSocketFactory().createSocket(serverUri, 5000).apply {
+            addListener(object : WebSocketAdapter() {
+                override fun onTextMessage(websocket: WebSocket?, message: String?) {
+
+                }
+
+                override fun onConnected(websocket: WebSocket?, headers: Map<String, List<String>>?) {
+                }
+            }).addExtension(WebSocketExtension.PERMESSAGE_DEFLATE)
+        }
+
+        GlobalScope.launch(Dispatchers.IO) {
+            // Your WebSocket connection code
+            ws.connect()
+            ws.sendText("Hello from Kotlin Client!")
+        }
+
+
+
     }
+
+
     fun start_camera() {
         textureView = findViewById(R.id.texture_view_cam)
         cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
@@ -246,6 +301,7 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         if (checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) permissionsLst.add(android.Manifest.permission.CAMERA)
         if (checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) permissionsLst.add(android.Manifest.permission.READ_EXTERNAL_STORAGE)
         if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) permissionsLst.add(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        if (checkSelfPermission(android.Manifest.permission.INTERNET) != PackageManager.PERMISSION_GRANTED) permissionsLst.add(android.Manifest.permission.INTERNET)
 
         if(permissionsLst.size > 0)
         {
@@ -377,50 +433,68 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     }
 
     private fun startTour() {
-        val locations = robot.locations.toMutableList()
+        tour_job = scope.launch {
+            val locations = robot.locations.toMutableList()
+            val startMsg: String = "Tour \nStarting"
 
-        val startMsg: String = "Tour \nStarting"
+            withContext(Dispatchers.Main)
+            {
+                button_start_tour.isEnabled = false
+                button_start_tour.isClickable = false
+                button_stop_tour.isEnabled = true
+                button_stop_tour.isClickable = true
+            }
 
-        this.button_start_tour.isEnabled = false
-        this.button_start_tour.isClickable = false
-
-        Thread(Runnable {
-            runOnUiThread{updateView(startMsg)}
-            Thread.sleep(2000)
             for (location in locations) {
+
 
                 // Avoid going to home base
                 if (location == "home base") {
                     continue
                 }
-
-                runOnUiThread{updateView("Going to: "+ location)}
+                if (!isActive) return@launch
                 speakText("On my way to: " + location)
 
-                robot.goTo(location, backwards = false, noBypass = false, SpeedLevel.MEDIUM)
-                waitGoTo()
+                if (!isActive) return@launch
+                goToLocation(location)
 
-                runOnUiThread{updateView("Arrived to: "+ location)}
+                if (!isActive) return@launch
                 speakText("Arrived to: " + location)
-
-                if (location == "stefan")
-                {
-                    speakText("Hallo Stefan, bald kann ich Bier mitbringen", lan = TtsRequest.Language.DE_DE)
-                }
             }
-            runOnUiThread{updateView("Tour Completed")}
-            robot.goTo("office", backwards = false, noBypass = false, SpeedLevel.MEDIUM)
-            waitGoTo()
-            speakText("Tour Completed I was Specifically designed for this application, this is my life purpose hope you enjoyed this unique experience")
 
-        }).start()
+            withContext(Dispatchers.Main)
+            {
+                button_start_tour.isEnabled = true
+                button_start_tour.isClickable = true
+                button_stop_tour.isEnabled = false
+                button_stop_tour.isClickable = false
+            }
+
+        }
     }
 
-
     private fun stopTour() {
-        this.button_start_tour.isEnabled = true
-        this.button_start_tour.isClickable = true
-        robot.stopMovement()
+        GlobalScope.launch(Dispatchers.Default) {
+            if(tour_job != null)
+            {
+                onGoToChannel.trySend(0)
+                onSpeakChannel.trySend(0)
+                tour_job!!.cancel()
+            }
+            withContext(Dispatchers.Main)
+            {
+                button_stop_tour.isEnabled = false
+                button_stop_tour.isClickable = false
+            }
+            robot.stopMovement()
+            speakText("Tour Cancelled for Safety Issues")
+            withContext(Dispatchers.Main)
+            {
+                button_start_tour.isEnabled = true
+                button_start_tour.isClickable = true
+            }
+
+        }
     }
 
     private fun updateView(text:String) {
@@ -428,25 +502,17 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     }
 
     private fun speakText(text:String, lan: TtsRequest.Language =  TtsRequest.Language.EN_US) {
-        robot.speak(TtsRequest.create(text, language = lan))
-        waitSpeak()
+        robot.speak(TtsRequest.create(text, language = lan, isShowOnConversationLayer = false))
+        runBlocking { onSpeakChannel.receive() }
     }
 
-    private fun waitSpeak() {
-        while(speak_status != TtsRequest.Status.COMPLETED)
-        {
-            Thread.sleep(100)
-        }
-        speak_status = TtsRequest.Status.PENDING
+    private fun goToLocation(location: String) {
+        robot.goTo(location, backwards = false, noBypass = false, SpeedLevel.MEDIUM)
+        runBlocking { onGoToChannel.receive() }
     }
 
-    private fun waitGoTo() {
-        while(goto_status != "complete")
-        {
-            Thread.sleep(100)
-        }
-        goto_status = ""
-    }
+
+
 
     override fun onUserInteraction(isInteracting: Boolean) {}
     override fun onNlpCompleted(nlpResult: NlpResult) {}
@@ -455,12 +521,18 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     override fun onWakeupWord(wakeupWord: String, direction: Int) {}
     override fun onPublish(message: ActivityStreamPublishMessage) {}
     override fun onTtsStatusChanged(ttsRequest: TtsRequest) {
-
         speak_status = ttsRequest.status
+        if (ttsRequest.status == TtsRequest.Status.COMPLETED)
+        {
+            onSpeakChannel.trySend(0)
+        }
     }
     override fun onBeWithMeStatusChanged(status: String) {}
     override fun onGoToLocationStatusChanged(location: String, status: String, descriptionId: Int, description: String) {
         goto_status = status
+        if (goto_status == "complete") {
+            onGoToChannel.trySend(0)
+        }
     }
     override fun onLocationsUpdated(locations: List<String>) {}
     override fun onConstraintBeWithStatusChanged(isConstraint: Boolean) {}
