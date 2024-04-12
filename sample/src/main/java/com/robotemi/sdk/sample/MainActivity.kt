@@ -258,30 +258,31 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
 
     fun start_camera() {
 
-        textureView = findViewById(R.id.texture_view_cam)
+//        textureView = findViewById(R.id.texture_view_cam)
         cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
         handlerThread = HandlerThread("videoThread")
         handlerThread.start()
         handler = Handler((handlerThread).looper)
-        textureView.surfaceTextureListener = object: TextureView.SurfaceTextureListener{
-            override fun onSurfaceTextureAvailable(p0: SurfaceTexture, p1: Int, p2: Int) {
-                open_camera()
 
-            }
-
-            override fun onSurfaceTextureSizeChanged(p0: SurfaceTexture, p1: Int, p2: Int) {
-            }
-
-            override fun onSurfaceTextureDestroyed(p0: SurfaceTexture): Boolean {
-                return false
-            }
-
-            override fun onSurfaceTextureUpdated(p0: SurfaceTexture) {
-                capReq = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
-                capReq.addTarget(imageReader.surface)
-                cameraCaptureSession.capture(capReq.build(), null, null)
-            }
-        }
+//        textureView.surfaceTextureListener = object: TextureView.SurfaceTextureListener{
+//            override fun onSurfaceTextureAvailable(p0: SurfaceTexture, p1: Int, p2: Int) {
+//                open_camera()
+//
+//            }
+//
+//            override fun onSurfaceTextureSizeChanged(p0: SurfaceTexture, p1: Int, p2: Int) {
+//            }
+//
+//            override fun onSurfaceTextureDestroyed(p0: SurfaceTexture): Boolean {
+//                return false
+//            }
+//
+//            override fun onSurfaceTextureUpdated(p0: SurfaceTexture) {
+//                capReq = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
+//                capReq.addTarget(imageReader.surface)
+//                cameraCaptureSession.capture(capReq.build(), null, null)
+//            }
+//        }
 
         imageReader = ImageReader.newInstance(720, 1280, ImageFormat.JPEG, 1)
         imageReader.setOnImageAvailableListener(object:ImageReader.OnImageAvailableListener{
@@ -290,11 +291,14 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
                 var buffer = image!!.planes[0].buffer
                 var bytes = ByteArray(buffer.remaining())
                 buffer.get(bytes)
+                image.close()
                 ws.sendBinary(bytes)
 //                ws.sendText("Hello from Kotlin Client!")
-                image.close()
+
             }
         }, handler)
+
+        open_camera()
     }
 
     @SuppressLint("MissingPermission")
@@ -302,14 +306,14 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         cameraManager.openCamera(this.cameraManager.cameraIdList[0], object: CameraDevice.StateCallback(){
             override fun onOpened(p0: CameraDevice) {
                 cameraDevice = p0
-                capReq = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
-                var surface = Surface(textureView.surfaceTexture)
-                capReq.addTarget(surface)
+                capReq = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
+//                var surface = Surface(textureView.surfaceTexture)
+                capReq.addTarget(imageReader.surface)
 
-                cameraDevice.createCaptureSession(listOf(surface, imageReader.surface), object: CameraCaptureSession.StateCallback(){
+                cameraDevice.createCaptureSession(listOf(imageReader.surface), object: CameraCaptureSession.StateCallback(){
                     override fun onConfigured(p0: CameraCaptureSession) {
                         cameraCaptureSession = p0
-                        cameraCaptureSession.setRepeatingRequest(capReq.build(), null, null)
+                        cameraCaptureSession.setRepeatingRequest(capReq.build(), null, handler)
                     }
 
                     override fun onConfigureFailed(p0: CameraCaptureSession) {
