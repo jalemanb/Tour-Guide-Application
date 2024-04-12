@@ -14,16 +14,20 @@ import android.content.res.AssetFileDescriptor
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Camera
+import android.graphics.ImageFormat
 import android.graphics.SurfaceTexture
 import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CaptureRequest
+import android.media.Image
+import android.media.ImageReader
 import android.media.MediaPlayer
 import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.Looper
 import android.os.RemoteException
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
@@ -165,6 +169,11 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     lateinit var handler: Handler
     lateinit var handlerThread: HandlerThread
     lateinit var capReq: CaptureRequest.Builder
+    lateinit var imageReader: ImageReader
+
+
+    // Websocket client
+    lateinit var ws: WebSocket
 
 
     @SuppressLint("SetTextI18n")
@@ -217,8 +226,25 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         button_stop_tour.isEnabled = false
         button_stop_tour.isClickable = false
 
-        val serverUri = "ws://10.42.0.1:8765"
-        val ws = WebSocketFactory().createSocket(serverUri, 5000).apply {
+        // Websocket configuration
+
+        ws = websocket_create("ws://10.42.0.1:8765", 5000)
+        ws.connectAsynchronously()
+        ws.setMissingCloseFrameAllowed(false);
+
+        Thread.sleep(1000)
+        ws.sendText("Hello from Kotlin Client!")
+
+//        GlobalScope.launch(Dispatchers.IO) {
+//            // Your WebSocket connection code
+//            ws.connect()
+//            ws.sendText("Hello from Kotlin Client!")
+//        }
+
+    }
+
+    private fun websocket_create(serverUri: String, timeout:Int):WebSocket {
+        return WebSocketFactory().createSocket(serverUri, timeout).apply {
             addListener(object : WebSocketAdapter() {
                 override fun onTextMessage(websocket: WebSocket?, message: String?) {
 
@@ -228,19 +254,10 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
                 }
             }).addExtension(WebSocketExtension.PERMESSAGE_DEFLATE)
         }
-
-        GlobalScope.launch(Dispatchers.IO) {
-            // Your WebSocket connection code
-            ws.connect()
-            ws.sendText("Hello from Kotlin Client!")
-        }
-
-
-
     }
 
-
     fun start_camera() {
+
         textureView = findViewById(R.id.texture_view_cam)
         cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
         handlerThread = HandlerThread("videoThread")
@@ -249,6 +266,7 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         textureView.surfaceTextureListener = object: TextureView.SurfaceTextureListener{
             override fun onSurfaceTextureAvailable(p0: SurfaceTexture, p1: Int, p2: Int) {
                 open_camera()
+
             }
 
             override fun onSurfaceTextureSizeChanged(p0: SurfaceTexture, p1: Int, p2: Int) {
@@ -259,8 +277,24 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
             }
 
             override fun onSurfaceTextureUpdated(p0: SurfaceTexture) {
+                capReq = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
+                capReq.addTarget(imageReader.surface)
+                cameraCaptureSession.capture(capReq.build(), null, null)
             }
         }
+
+        imageReader = ImageReader.newInstance(720, 1280, ImageFormat.JPEG, 1)
+        imageReader.setOnImageAvailableListener(object:ImageReader.OnImageAvailableListener{
+            override fun onImageAvailable(p0: ImageReader?) {
+                var image = p0?.acquireLatestImage()
+                var buffer = image!!.planes[0].buffer
+                var bytes = ByteArray(buffer.remaining())
+                buffer.get(bytes)
+                ws.sendBinary(bytes)
+//                ws.sendText("Hello from Kotlin Client!")
+                image.close()
+            }
+        }, handler)
     }
 
     @SuppressLint("MissingPermission")
@@ -271,7 +305,8 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
                 capReq = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
                 var surface = Surface(textureView.surfaceTexture)
                 capReq.addTarget(surface)
-                cameraDevice.createCaptureSession(listOf(surface), object: CameraCaptureSession.StateCallback(){
+
+                cameraDevice.createCaptureSession(listOf(surface, imageReader.surface), object: CameraCaptureSession.StateCallback(){
                     override fun onConfigured(p0: CameraCaptureSession) {
                         cameraCaptureSession = p0
                         cameraCaptureSession.setRepeatingRequest(capReq.build(), null, null)
@@ -510,9 +545,6 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         robot.goTo(location, backwards = false, noBypass = false, SpeedLevel.MEDIUM)
         runBlocking { onGoToChannel.receive() }
     }
-
-
-
 
     override fun onUserInteraction(isInteracting: Boolean) {}
     override fun onNlpCompleted(nlpResult: NlpResult) {}
