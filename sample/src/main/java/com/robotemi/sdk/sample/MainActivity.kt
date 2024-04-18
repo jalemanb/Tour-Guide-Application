@@ -175,7 +175,6 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     // Websocket client
     lateinit var ws: WebSocket
 
-
     @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -258,31 +257,10 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
 
     fun start_camera() {
 
-//        textureView = findViewById(R.id.texture_view_cam)
         cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
         handlerThread = HandlerThread("videoThread")
         handlerThread.start()
         handler = Handler((handlerThread).looper)
-
-//        textureView.surfaceTextureListener = object: TextureView.SurfaceTextureListener{
-//            override fun onSurfaceTextureAvailable(p0: SurfaceTexture, p1: Int, p2: Int) {
-//                open_camera()
-//
-//            }
-//
-//            override fun onSurfaceTextureSizeChanged(p0: SurfaceTexture, p1: Int, p2: Int) {
-//            }
-//
-//            override fun onSurfaceTextureDestroyed(p0: SurfaceTexture): Boolean {
-//                return false
-//            }
-//
-//            override fun onSurfaceTextureUpdated(p0: SurfaceTexture) {
-//                capReq = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
-//                capReq.addTarget(imageReader.surface)
-//                cameraCaptureSession.capture(capReq.build(), null, null)
-//            }
-//        }
 
         imageReader = ImageReader.newInstance(720, 1280, ImageFormat.JPEG, 1)
         imageReader.setOnImageAvailableListener(object:ImageReader.OnImageAvailableListener{
@@ -293,8 +271,6 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
                 buffer.get(bytes)
                 image.close()
                 ws.sendBinary(bytes)
-//                ws.sendText("Hello from Kotlin Client!")
-
             }
         }, handler)
 
@@ -320,6 +296,7 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
                         TODO("Not yet implemented")
                     }
                 }, handler)
+
 
             }
 
@@ -486,7 +463,6 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
 
             for (location in locations) {
 
-
                 // Avoid going to home base
                 if (location == "home base") {
                     continue
@@ -644,7 +620,6 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
             }
         }
     }
-
     private fun hideKeyboard() {
         val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
         var view = currentFocus
@@ -653,6 +628,4 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         }
         imm.hideSoftInputFromWindow(view.windowToken, 0)
     }
-
-
 }
