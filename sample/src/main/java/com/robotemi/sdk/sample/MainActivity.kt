@@ -145,9 +145,6 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
 
     private var tts: TextToSpeech? = null
 
-    private var goto_status: String? = null
-    private var speak_status: TtsRequest.Status? = null
-
     private var debugReceiver: TemiBroadcastReceiver? = null
 
     private val assistantReceiver = AssistantChangeReceiver()
@@ -157,23 +154,13 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     val scope = CoroutineScope(Dispatchers.Default + CoroutineName("MyScope"))
 
     val onGoToChannel = Channel<Int>()
+
     val onSpeakChannel = Channel<Int>()
 
-
-
-    lateinit var cameraManager: CameraManager
-    lateinit var textureView: TextureView
-    lateinit var cameraCaptureSession: CameraCaptureSession
-    lateinit var cameraDevice: CameraDevice
-    lateinit var captureRequest: CaptureRequest
-    lateinit var handler: Handler
-    lateinit var handlerThread: HandlerThread
-    lateinit var capReq: CaptureRequest.Builder
-    lateinit var imageReader: ImageReader
-
-
     // Websocket client
-    lateinit var ws: WebSocket
+    private lateinit var ws: WebSocket
+
+    private lateinit var cameraService: CameraDriver
 
     @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -213,10 +200,8 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         registerReceiver(debugReceiver, IntentFilter(TemiBroadcastReceiver.ACTION_DEBUG))
         registerReceiver(assistantReceiver, IntentFilter(AssistantChangeReceiver.ACTION_ASSISTANT_SELECTION))
 
-        // CAMERA Permisssions
+        // Get General Permissions Permisssions
         get_permissions()
-        // Start Camera Streaming
-        start_camera() // https://www.youtube.com/watch?v=S-7H72UTiBU
 
         // Enable start tour button assuming the robot start on idle state
         // Disable stop tour button assuming the root is already stopped at the beginning
@@ -234,12 +219,9 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         Thread.sleep(1000)
         ws.sendText("Hello from Kotlin Client!")
 
-//        GlobalScope.launch(Dispatchers.IO) {
-//            // Your WebSocket connection code
-//            ws.connect()
-//            ws.sendText("Hello from Kotlin Client!")
-//        }
-
+        // Start Camera Streaming
+        cameraService = CameraDriver(this, ws)
+        cameraService.start_camera()
     }
 
     private fun websocket_create(serverUri: String, timeout:Int):WebSocket {
@@ -253,62 +235,6 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
                 }
             }).addExtension(WebSocketExtension.PERMESSAGE_DEFLATE)
         }
-    }
-
-    fun start_camera() {
-
-        cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
-        handlerThread = HandlerThread("videoThread")
-        handlerThread.start()
-        handler = Handler((handlerThread).looper)
-
-        imageReader = ImageReader.newInstance(720, 1280, ImageFormat.JPEG, 1)
-        imageReader.setOnImageAvailableListener(object:ImageReader.OnImageAvailableListener{
-            override fun onImageAvailable(p0: ImageReader?) {
-                var image = p0?.acquireLatestImage()
-                var buffer = image!!.planes[0].buffer
-                var bytes = ByteArray(buffer.remaining())
-                buffer.get(bytes)
-                image.close()
-                ws.sendBinary(bytes)
-            }
-        }, handler)
-
-        open_camera()
-    }
-
-    @SuppressLint("MissingPermission")
-    private fun open_camera() {
-        cameraManager.openCamera(this.cameraManager.cameraIdList[0], object: CameraDevice.StateCallback(){
-            override fun onOpened(p0: CameraDevice) {
-                cameraDevice = p0
-                capReq = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
-//                var surface = Surface(textureView.surfaceTexture)
-                capReq.addTarget(imageReader.surface)
-
-                cameraDevice.createCaptureSession(listOf(imageReader.surface), object: CameraCaptureSession.StateCallback(){
-                    override fun onConfigured(p0: CameraCaptureSession) {
-                        cameraCaptureSession = p0
-                        cameraCaptureSession.setRepeatingRequest(capReq.build(), null, handler)
-                    }
-
-                    override fun onConfigureFailed(p0: CameraCaptureSession) {
-                        TODO("Not yet implemented")
-                    }
-                }, handler)
-
-
-            }
-
-            override fun onClosed(camera: CameraDevice) {
-            }
-
-            override fun onDisconnected(p0: CameraDevice) {
-            }
-
-            override fun onError(p0: CameraDevice, p1: Int) {
-            }
-        }, handler)
     }
 
     private fun get_permissions() {
@@ -440,6 +366,9 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
 
         unregisterReceiver(assistantReceiver)
         super.onDestroy()
+
+        // Stop Camera Service
+        cameraService.stopCamera()
     }
 
     private fun initOnClickListener() {
@@ -484,7 +413,6 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
                 button_stop_tour.isEnabled = false
                 button_stop_tour.isClickable = false
             }
-
         }
     }
 
@@ -533,7 +461,6 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     override fun onWakeupWord(wakeupWord: String, direction: Int) {}
     override fun onPublish(message: ActivityStreamPublishMessage) {}
     override fun onTtsStatusChanged(ttsRequest: TtsRequest) {
-        speak_status = ttsRequest.status
         if (ttsRequest.status == TtsRequest.Status.COMPLETED)
         {
             onSpeakChannel.trySend(0)
@@ -541,8 +468,7 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     }
     override fun onBeWithMeStatusChanged(status: String) {}
     override fun onGoToLocationStatusChanged(location: String, status: String, descriptionId: Int, description: String) {
-        goto_status = status
-        if (goto_status == "complete") {
+        if (status == "complete") {
             onGoToChannel.trySend(0)
         }
     }
