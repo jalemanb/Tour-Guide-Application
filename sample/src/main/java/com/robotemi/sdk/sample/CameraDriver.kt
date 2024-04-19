@@ -1,5 +1,6 @@
 package com.robotemi.sdk.sample
 
+import WebSocketCom
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
@@ -20,9 +21,9 @@ import com.neovisionaries.ws.client.WebSocketAdapter
 import com.neovisionaries.ws.client.WebSocketExtension
 import com.neovisionaries.ws.client.WebSocketFactory
 
-class CameraDriver(private val context: Context, websocket: WebSocket) {
+class CameraDriver(private val context: Context, websocket: WebSocketCom) {
 
-    private var ws: WebSocket
+    private var ws: WebSocketCom
     private lateinit var contextExt: Context
     private lateinit var cameraManager: CameraManager
     private lateinit var textureView: TextureView
@@ -46,13 +47,16 @@ class CameraDriver(private val context: Context, websocket: WebSocket) {
         handlerThread.start()
         handler = Handler((handlerThread).looper)
 
-        imageReader = ImageReader.newInstance(720, 1280, ImageFormat.JPEG, 1).apply {
+        imageReader = ImageReader.newInstance(480, 640, ImageFormat.JPEG, 1).apply {
             setOnImageAvailableListener({ reader ->
                 val image = reader.acquireNextImage()
                 val buffer = image.planes[0].buffer
                 val bytes = ByteArray(buffer.remaining()).also { buffer.get(it) }
                 image.close()
-                ws.sendBinary(bytes) // Send image data over WebSocket
+                if (ws.isConnected())
+                {
+                    ws.getWebSocket().sendBinary(bytes) // Send image data over WebSocket
+                }
             }, handler)
         }
 

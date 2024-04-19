@@ -1,5 +1,6 @@
 package com.robotemi.sdk.sample
 
+import WebSocketCom
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -53,6 +54,7 @@ import androidx.core.app.ActivityCompat
 import com.google.gson.Gson
 import com.neovisionaries.ws.client.WebSocket
 import com.neovisionaries.ws.client.WebSocketAdapter
+import com.neovisionaries.ws.client.WebSocketException
 import com.neovisionaries.ws.client.WebSocketExtension
 import com.neovisionaries.ws.client.WebSocketFactory
 import com.robotemi.sdk.*
@@ -158,7 +160,7 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     val onSpeakChannel = Channel<Int>()
 
     // Websocket client
-    private lateinit var ws: WebSocket
+    private lateinit var ws: WebSocketCom
 
     private lateinit var cameraService: CameraDriver
 
@@ -211,30 +213,16 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         button_stop_tour.isClickable = false
 
         // Websocket configuration
-
-        ws = websocket_create("ws://10.42.0.1:8765", 5000)
-        ws.connectAsynchronously()
-        ws.setMissingCloseFrameAllowed(false);
-
-        Thread.sleep(1000)
-        ws.sendText("Hello from Kotlin Client!")
+        ws = object : WebSocketCom("ws://10.42.0.1:8765", 5000) {
+            override fun onCommand(msg:String) {
+                super.onCommand(msg)
+//                val obj = Json.decodeFromString<Data>("""{"a":42, "b": "str"}""")
+            }
+        }
 
         // Start Camera Streaming
         cameraService = CameraDriver(this, ws)
         cameraService.start_camera()
-    }
-
-    private fun websocket_create(serverUri: String, timeout:Int):WebSocket {
-        return WebSocketFactory().createSocket(serverUri, timeout).apply {
-            addListener(object : WebSocketAdapter() {
-                override fun onTextMessage(websocket: WebSocket?, message: String?) {
-
-                }
-
-                override fun onConnected(websocket: WebSocket?, headers: Map<String, List<String>>?) {
-                }
-            }).addExtension(WebSocketExtension.PERMESSAGE_DEFLATE)
-        }
     }
 
     private fun get_permissions() {
@@ -369,6 +357,8 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
 
         // Stop Camera Service
         cameraService.stopCamera()
+        // Stop web socket
+        ws.close()
     }
 
     private fun initOnClickListener() {
