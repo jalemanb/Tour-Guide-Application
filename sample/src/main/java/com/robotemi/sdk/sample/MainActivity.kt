@@ -113,6 +113,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import java.io.File
@@ -123,7 +124,6 @@ import java.util.concurrent.CancellationException
 import java.util.concurrent.Executors
 import javax.net.ssl.SSLEngineResult.Status
 import kotlin.concurrent.thread
-
 
 class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     ConversationViewAttachesListener, WakeupWordListener, ActivityStreamPublishListener,
@@ -158,6 +158,8 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     val onGoToChannel = Channel<Int>()
 
     val onSpeakChannel = Channel<Int>()
+
+    val mutex = Mutex()
 
     // Websocket client
     private lateinit var ws: WebSocketCom
@@ -215,8 +217,20 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         // Websocket configuration
         ws = object : WebSocketCom("ws://10.42.0.1:8765", 5000) {
             override fun onCommand(msg:String) {
-                super.onCommand(msg)
-//                val obj = Json.decodeFromString<Data>("""{"a":42, "b": "str"}""")
+                GlobalScope.launch(Dispatchers.IO) {
+                    mutex.withLock {
+                        val commandObj = Gson().fromJson(msg, TemiCommand::class.java)
+                        Log.d("WebSocket", "Command Sent is: ${commandObj.command}")
+                        // Implement Switch stamente for each Robot Capability
+                        when (commandObj.command) {
+                            0 -> Log.d("WebSocket", "Hola")
+                            1 -> Log.d("WebSocket", "Adios")
+                            else -> {
+                                Log.d("WebSocket", "Command Sent is: ${commandObj.command}")
+                            }
+                        }
+                    }
+                }
             }
         }
 
