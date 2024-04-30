@@ -4,64 +4,22 @@ import WebSocketCom
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.app.AlertDialog
-import android.app.Dialog
-import android.content.Context
-import android.content.DialogInterface
-import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.content.res.AssetFileDescriptor
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Camera
-import android.graphics.ImageFormat
-import android.graphics.SurfaceTexture
-import android.hardware.camera2.CameraCaptureSession
-import android.hardware.camera2.CameraDevice
-import android.hardware.camera2.CameraManager
-import android.hardware.camera2.CaptureRequest
-import android.media.Image
-import android.media.ImageReader
-import android.media.MediaPlayer
 import android.os.Bundle
-import android.os.Environment
 import android.os.Handler
-import android.os.HandlerThread
 import android.os.Looper
-import android.os.RemoteException
 import android.speech.tts.TextToSpeech
-import android.speech.tts.UtteranceProgressListener
-import android.text.method.ScrollingMovementMethod
 import android.util.Log
-import android.view.Gravity
-import android.view.KeyEvent
-import android.view.MotionEvent
-import android.view.Surface
-import android.view.TextureView
 import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
-import android.widget.AdapterView
-import android.widget.AdapterView.OnItemClickListener
-import android.widget.ArrayAdapter
-import android.widget.SeekBar
-import android.widget.SeekBar.OnSeekBarChangeListener
-import android.widget.Toast
-import androidx.annotation.CheckResult
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import com.google.gson.Gson
-import com.neovisionaries.ws.client.WebSocket
-import com.neovisionaries.ws.client.WebSocketAdapter
-import com.neovisionaries.ws.client.WebSocketException
-import com.neovisionaries.ws.client.WebSocketExtension
-import com.neovisionaries.ws.client.WebSocketFactory
 import com.robotemi.sdk.*
 import com.robotemi.sdk.Robot.*
 import com.robotemi.sdk.Robot.Companion.getInstance
-import com.robotemi.sdk.TtsRequest.Companion.create
-import com.robotemi.sdk.activitystream.ActivityStreamObject
 import com.robotemi.sdk.activitystream.ActivityStreamPublishMessage
 import com.robotemi.sdk.constants.*
 import com.robotemi.sdk.exception.OnSdkExceptionListener
@@ -70,8 +28,6 @@ import com.robotemi.sdk.face.ContactModel
 import com.robotemi.sdk.face.OnContinuousFaceRecognizedListener
 import com.robotemi.sdk.face.OnFaceRecognizedListener
 import com.robotemi.sdk.listeners.*
-import com.robotemi.sdk.map.Floor
-import com.robotemi.sdk.map.MapModel
 import com.robotemi.sdk.map.OnLoadFloorStatusChangedListener
 import com.robotemi.sdk.map.OnLoadMapStatusChangedListener
 import com.robotemi.sdk.model.CallEventModel
@@ -81,49 +37,27 @@ import com.robotemi.sdk.navigation.listener.OnDistanceToDestinationChangedListen
 import com.robotemi.sdk.navigation.listener.OnDistanceToLocationChangedListener
 import com.robotemi.sdk.navigation.listener.OnReposeStatusChangedListener
 import com.robotemi.sdk.navigation.model.Position
-import com.robotemi.sdk.navigation.model.SafetyLevel
 import com.robotemi.sdk.navigation.model.SpeedLevel
 import com.robotemi.sdk.permission.OnRequestPermissionResultListener
 import com.robotemi.sdk.permission.Permission
 import com.robotemi.sdk.sequence.OnSequencePlayStatusChangedListener
-import com.robotemi.sdk.sequence.SequenceModel
-import com.robotemi.sdk.telepresence.CallState
-import com.robotemi.sdk.telepresence.LinkBasedMeeting
-import com.robotemi.sdk.telepresence.Participant
-import com.robotemi.sdk.tourguide.TourModel
 import com.robotemi.sdk.voice.ITtsService
-import com.robotemi.sdk.voice.model.TtsVoice
 import kotlinx.android.synthetic.main.activity_main.*
-import kotlinx.android.synthetic.main.group_app_and_permission.*
-import kotlinx.android.synthetic.main.group_buttons.*
-import kotlinx.android.synthetic.main.group_map_and_movement.*
-import kotlinx.android.synthetic.main.group_resources.*
-import kotlinx.android.synthetic.main.group_settings_and_status.*
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Dispatchers.Default
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.yield
-import java.io.File
-import java.io.FileOutputStream
-import java.io.IOException
-import java.util.*
-import java.util.concurrent.CancellationException
 import java.util.concurrent.Executors
-import javax.net.ssl.SSLEngineResult.Status
-import kotlin.concurrent.thread
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     ConversationViewAttachesListener, WakeupWordListener, ActivityStreamPublishListener,
@@ -161,10 +95,26 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
 
     val mutex = Mutex()
 
-    // Websocket client
-    private lateinit var ws: WebSocketCom
+    val gson = Gson()
 
-    private lateinit var cameraService: CameraDriver
+    private val positionMutex = Mutex()
+
+    private var temiPosition:Position = Position(0F, 0F, 0F, 0)
+
+    val positionExecutor = Executors.newSingleThreadScheduledExecutor()
+    val mapExecutor = Executors.newSingleThreadScheduledExecutor()
+
+    private lateinit var future_map:ScheduledFuture<*>
+    private lateinit var future_position:ScheduledFuture<*>
+
+    // Websocket client
+    private lateinit var ws_getloc: WebSocketCom
+    private lateinit var ws_speak: WebSocketCom
+    private lateinit var ws_goto: WebSocketCom
+    private lateinit var ws_rosbridge: WebSocketCom
+    private lateinit var ws_mapserver: WebSocketCom
+
+//    private lateinit var cameraService: CameraDriver
 
     @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -215,16 +165,15 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         button_stop_tour.isClickable = false
 
         // Websocket configuration
-        ws = object : WebSocketCom("ws://10.42.0.1:8765", 5000) {
+        ws_getloc = object : WebSocketCom("ws://10.42.0.1:8760", 5000) {
             override fun onCommand(msg:String) {
                 GlobalScope.launch(Dispatchers.IO) {
                     mutex.withLock {
                         val commandObj = Gson().fromJson(msg, TemiCommand::class.java)
-                        Log.d("WebSocket", "Command Sent is: ${commandObj.command}")
+                        Log.d("WebSocket", "Command Getloc Received")
                         // Implement Switch stamente for each Robot Capability
                         when (commandObj.command) {
-                            0 -> Log.d("WebSocket", "Hola")
-                            1 -> Log.d("WebSocket", "Adios")
+                            0 -> getloc_cmd(commandObj)
                             else -> {
                                 Log.d("WebSocket", "Command Sent is: ${commandObj.command}")
                             }
@@ -234,11 +183,123 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
             }
         }
 
-        // Start Camera Streaming
-        cameraService = CameraDriver(this, ws)
-        cameraService.start_camera()
-    }
+        ws_speak = object : WebSocketCom("ws://10.42.0.1:8761", 5000) {
+            override fun onCommand(msg:String) {
+                GlobalScope.launch(Dispatchers.IO) {
+                    mutex.withLock {
+                        val commandObj = Gson().fromJson(msg, TemiCommand::class.java)
+                        Log.d("WebSocket", "Command Speak Received")
+                        // Implement Switch stamente for each Robot Capability
+                        when (commandObj.command) {
+                            1 -> speak_cmd(commandObj)
+                            else -> {
+                                Log.d("WebSocket", "Command Sent is: ${commandObj.command}")
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
+        ws_goto = object : WebSocketCom("ws://10.42.0.1:8762", 5000) {
+            override fun onCommand(msg:String) {
+                GlobalScope.launch(Dispatchers.IO) {
+                    mutex.withLock {
+                        val commandObj = Gson().fromJson(msg, TemiCommand::class.java)
+                        Log.d("WebSocket", "Command Goto Received")
+                        // Implement Switch stamente for each Robot Capability
+                        if(commandObj.flag0)
+                        {
+                            gotopos_cmd(commandObj)
+                        }
+                        else
+                        {
+                            goto_cmd(commandObj)
+                        }
+                    }
+                }
+            }
+        }
+
+        ws_rosbridge = object : WebSocketCom("ws://10.42.0.1:8763", 5000) {
+            override fun onCommand(msg:String) {
+                GlobalScope.launch(Dispatchers.IO) {
+                    mutex.withLock {
+                        val commandObj = Gson().fromJson(msg, TemiCommand::class.java)
+                        Log.d("WebSocket", "Command Joy_cmd received")
+                        joy_cmd(commandObj)
+                    }
+                }
+            }
+        }
+
+        ws_mapserver = object : WebSocketCom("ws://10.42.0.1:8764", 5000) {
+            override fun onCommand(msg:String) {
+                GlobalScope.launch(Dispatchers.IO) {
+                    mutex.withLock {
+                        val commandObj = Gson().fromJson(msg, TemiCommand::class.java)
+                    }
+                }
+            }
+        }
+
+        val positionScope = CoroutineScope(Dispatchers.IO) // Assuming IO-bound tasks
+        val mapScope = CoroutineScope(Dispatchers.IO)
+
+        future_position = positionExecutor.scheduleAtFixedRate({
+            positionScope.launch {
+                positionMutex.withLock {
+                    Log.d("PERIODIC", "Pose is: ${temiPosition.x}, ${temiPosition.y}, ${temiPosition.yaw}")
+                    // Get current robot pose and send it to the temi_bridge
+                    val temiPositionJson = gson.toJson(temiPosition)
+                    ws_rosbridge.getWebSocket().sendText(temiPositionJson)
+                }
+            }
+        }, 0, 30, TimeUnit.MILLISECONDS)
+
+        future_map = mapExecutor.scheduleAtFixedRate({
+            mapScope.launch {
+                    // Get the current map data and send it to the temi_bridge
+                    val currentMap = robot.getMapData()
+                    val temiMapJson = gson.toJson(TemiMap(currentMap!!.mapInfo.height, currentMap.mapInfo.width,
+                                                          currentMap.mapInfo.originX,  currentMap.mapInfo.originY,
+                                                          currentMap.mapInfo.resolution, currentMap.mapImage.data))
+                    ws_mapserver.getWebSocket().sendText(temiMapJson)
+            }
+        }, 0, 1, TimeUnit.SECONDS)
+
+        // Start Camera Streaming
+//        cameraService = CameraDriver(this, ws)
+//        cameraService.start_camera()
+    }
+    private fun getloc_cmd(cmd:TemiCommand) {
+        val locations = robot.locations.toMutableList()
+        // The getloc Action is Labeled as 0
+        val statusList = listOf("pending", "started", "processing", "complete")
+        for (statusString in statusList) {
+            val jsonString = gson.toJson(TemiStatus(0,statusString, locations))
+            ws_getloc.getWebSocket().sendText(jsonString)
+            Thread.sleep(50)
+        }
+    }
+    private fun speak_cmd(cmd:TemiCommand) {
+        robot.speak(TtsRequest.create(cmd.text!!, language = TtsRequest.Language.EN_US, isShowOnConversationLayer = false))
+    }
+    private fun goto_cmd(cmd:TemiCommand) {
+        robot.goTo(cmd.text!!, backwards = false, noBypass = false, SpeedLevel.MEDIUM)
+    }
+    private fun gotopos_cmd(cmd:TemiCommand) {
+        val position: Position = Position(x = cmd.x!!, y = cmd.y!!, yaw = cmd.angle!!)
+        robot.goToPosition( position, backwards = false, noBypass = false, speedLevel = SpeedLevel.MEDIUM)
+    }
+    private fun joy_cmd(cmd:TemiCommand) {
+
+        robot.skidJoy(cmd.x!!,cmd.y!!, false)
+
+    }
+    private fun follow_cmd(cmd:TemiCommand) {
+        Log.d("CMD", "Implement Follow Command")
+    }
     private fun get_permissions() {
         var permissionsLst = mutableListOf<String>()
 
@@ -339,7 +400,6 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         robot.removeOnRobotDragStateChangedListener(this)
         super.onStop()
     }
-
     override fun onDestroy() {
         robot.removeOnRequestPermissionResultListener(this)
         robot.removeOnTelepresenceEventChangedListener(this)
@@ -370,9 +430,17 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         super.onDestroy()
 
         // Stop Camera Service
-        cameraService.stopCamera()
-        // Stop web socket
-        ws.close()
+//        cameraService.stopCamera()
+        // Stop web sockets
+        ws_speak.close()
+        ws_getloc.close()
+        ws_goto.close()
+        ws_rosbridge.close()
+        ws_mapserver.close()
+
+        future_position.cancel(true)
+        future_map.cancel(true)
+        positionExecutor.shutdown()
     }
 
     private fun initOnClickListener() {
@@ -440,7 +508,6 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
                 button_start_tour.isEnabled = true
                 button_start_tour.isClickable = true
             }
-
         }
     }
 
@@ -465,6 +532,29 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     override fun onWakeupWord(wakeupWord: String, direction: Int) {}
     override fun onPublish(message: ActivityStreamPublishMessage) {}
     override fun onTtsStatusChanged(ttsRequest: TtsRequest) {
+        // Send The Status
+        var statusString:String? = null
+        when (ttsRequest.status) {
+            TtsRequest.Status.COMPLETED -> statusString = "complete"
+            TtsRequest.Status.PENDING -> statusString = "pending"
+            TtsRequest.Status.PROCESSING -> statusString = "processing"
+            TtsRequest.Status.STARTED -> statusString = "started"
+            TtsRequest.Status.ERROR -> statusString = "error"
+            TtsRequest.Status.NOT_ALLOWED -> statusString = "not_allowed"
+            TtsRequest.Status.CANCELED -> statusString = "cancelled"
+            else -> {
+                Log.d("SpeakStatus", "Invalid Status")
+            }
+        }
+
+        val templist = mutableListOf<String>()
+        templist.add("BIELFELD")
+
+        // The Speak Action is Labeled as 1
+        val jsonString = gson.toJson(TemiStatus(1,statusString, templist))
+        ws_speak.getWebSocket().sendText(jsonString)
+
+        // Check For The Status
         if (ttsRequest.status == TtsRequest.Status.COMPLETED)
         {
             onSpeakChannel.trySend(0)
@@ -472,6 +562,11 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     }
     override fun onBeWithMeStatusChanged(status: String) {}
     override fun onGoToLocationStatusChanged(location: String, status: String, descriptionId: Int, description: String) {
+
+        val templist = mutableListOf<String>()
+        val jsonString = gson.toJson(TemiStatus(2,status, templist))
+        ws_goto.getWebSocket().sendText(jsonString)
+
         if (status == "complete") {
             onGoToChannel.trySend(0)
         }
@@ -483,7 +578,13 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     override fun onTelepresenceEventChanged(callEventModel: CallEventModel) {}
     override fun onRequestPermissionResult(permission: Permission, grantResult: Int, requestCode: Int) {}
     override fun onDistanceToLocationChanged(distances: Map<String, Float>) {}
-    override fun onCurrentPositionChanged(position: Position) {}
+    override fun onCurrentPositionChanged(position: Position) {
+        runBlocking {
+            positionMutex.withLock {
+                temiPosition = position
+            }
+        }
+    }
     override fun onSequencePlayStatusChanged(status: Int) {}
     override fun onRobotLifted(isLifted: Boolean, reason: String) {}
     override fun onDetectionDataChanged(detectionData: DetectionData) {}
