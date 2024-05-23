@@ -98,6 +98,8 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     val gson = Gson()
 
     private val positionMutex = Mutex()
+    private val mapMutex = Mutex()
+
 
     private var temiPosition:Position = Position(0F, 0F, 0F, 0)
 
@@ -111,6 +113,9 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     private lateinit var ws_getloc: WebSocketCom
     private lateinit var ws_speak: WebSocketCom
     private lateinit var ws_goto: WebSocketCom
+    private lateinit var ws_turnby: WebSocketCom
+    private lateinit var ws_tiltangle: WebSocketCom
+
     private lateinit var ws_rosbridge: WebSocketCom
     private lateinit var ws_mapserver: WebSocketCom
 
@@ -159,10 +164,10 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
 
         // Enable start tour button assuming the robot start on idle state
         // Disable stop tour button assuming the root is already stopped at the beginning
-        button_start_tour.isEnabled = true
-        button_start_tour.isClickable = true
-        button_stop_tour.isEnabled = false
-        button_stop_tour.isClickable = false
+        button_speakEn.isEnabled = true
+        button_speakEn.isClickable = true
+        button_speakDe.isEnabled = true
+        button_speakDe.isClickable = true
 
         // Websocket configuration
         ws_getloc = object : WebSocketCom("ws://10.42.0.1:8760", 5000) {
@@ -221,7 +226,32 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
             }
         }
 
-        ws_rosbridge = object : WebSocketCom("ws://10.42.0.1:8763", 5000) {
+        ws_turnby = object : WebSocketCom("ws://10.42.0.1:8763", 5000) {
+            override fun onCommand(msg:String) {
+                GlobalScope.launch(Dispatchers.IO) {
+                    mutex.withLock {
+                        val commandObj = Gson().fromJson(msg, TemiCommand::class.java)
+                        Log.d("TurnBy", "Command TurnBy Received")
+                        // Implement Switch stamente for each Robot Capability
+                        turnby_cmd(commandObj)
+                    }
+                }
+            }
+        }
+
+        ws_tiltangle = object : WebSocketCom("ws://10.42.0.1:8764", 5000) {
+            override fun onCommand(msg:String) {
+                GlobalScope.launch(Dispatchers.IO) {
+                    mutex.withLock {
+                        val commandObj = Gson().fromJson(msg, TemiCommand::class.java)
+                        Log.d("WebSocket", "Command TiltAngle Received")
+                        tiltangle_cmd(commandObj)
+                    }
+                }
+            }
+        }
+
+        ws_rosbridge = object : WebSocketCom("ws://10.42.0.1:8768", 5000) {
             override fun onCommand(msg:String) {
                 GlobalScope.launch(Dispatchers.IO) {
                     mutex.withLock {
@@ -233,7 +263,7 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
             }
         }
 
-        ws_mapserver = object : WebSocketCom("ws://10.42.0.1:8764", 5000) {
+        ws_mapserver = object : WebSocketCom("ws://10.42.0.1:8769", 5000) {
             override fun onCommand(msg:String) {
                 GlobalScope.launch(Dispatchers.IO) {
                     mutex.withLock {
@@ -259,12 +289,14 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
 
         future_map = mapExecutor.scheduleAtFixedRate({
             mapScope.launch {
+                mapMutex.withLock {
                     // Get the current map data and send it to the temi_bridge
                     val currentMap = robot.getMapData()
                     val temiMapJson = gson.toJson(TemiMap(currentMap!!.mapInfo.height, currentMap.mapInfo.width,
-                                                          currentMap.mapInfo.originX,  currentMap.mapInfo.originY,
-                                                          currentMap.mapInfo.resolution, currentMap.mapImage.data))
+                        currentMap.mapInfo.originX,  currentMap.mapInfo.originY,
+                        currentMap.mapInfo.resolution, currentMap.mapImage.data))
                     ws_mapserver.getWebSocket().sendText(temiMapJson)
+                }
             }
         }, 0, 1, TimeUnit.SECONDS)
 
@@ -279,7 +311,7 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         for (statusString in statusList) {
             val jsonString = gson.toJson(TemiStatus(0,statusString, locations))
             ws_getloc.getWebSocket().sendText(jsonString)
-            Thread.sleep(50)
+            Thread.sleep(100)
         }
     }
     private fun speak_cmd(cmd:TemiCommand) {
@@ -293,13 +325,27 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         robot.goToPosition( position, backwards = false, noBypass = false, speedLevel = SpeedLevel.MEDIUM)
     }
     private fun joy_cmd(cmd:TemiCommand) {
-
         robot.skidJoy(cmd.x!!,cmd.y!!, false)
+    }
+    private fun turnby_cmd(cmd:TemiCommand) {
+        robot.turnBy(cmd.angle!!.toInt(), 1.0F)
 
+        Log.d("TurnBy", "Executing Stuff")
+    }
+    private fun tiltangle_cmd(cmd:TemiCommand) {
+        robot.tiltAngle(cmd.angle!!.toInt().coerceIn(-25, 55), 0.7F)
+        val statusList = listOf("pending", "started", "processing", "complete")
+        val templist = mutableListOf<String>()
+        for (statusString in statusList) {
+            val jsonString = gson.toJson(TemiStatus(4,statusString, templist))
+            ws_tiltangle.getWebSocket().sendText(jsonString)
+            Thread.sleep(50)
+        }
     }
     private fun follow_cmd(cmd:TemiCommand) {
         Log.d("CMD", "Implement Follow Command")
     }
+
     private fun get_permissions() {
         var permissionsLst = mutableListOf<String>()
 
@@ -430,11 +476,14 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         super.onDestroy()
 
         // Stop Camera Service
-//        cameraService.stopCamera()
+        // cameraService.stopCamera()
         // Stop web sockets
         ws_speak.close()
         ws_getloc.close()
         ws_goto.close()
+        ws_turnby.close()
+        ws_tiltangle.close()
+
         ws_rosbridge.close()
         ws_mapserver.close()
 
@@ -445,74 +494,22 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
 
     private fun initOnClickListener() {
 
-        button_start_tour.setOnClickListener { startTour() }
-        button_stop_tour.setOnClickListener { stopTour() }
+        button_speakDe.setOnClickListener { speakDe() }
+        button_speakEn.setOnClickListener { speakEn() }
     }
 
-    private fun startTour() {
-        tour_job = scope.launch {
-            val locations = robot.locations.toMutableList()
-            val startMsg: String = "Tour \nStarting"
+    private fun speakDe() {
+        robot.speak(TtsRequest.create("Willkommen, mein Name ist TEMI. Ich freue mich, heute hier zu sein und Teil des DiBami-Projekts zu sein. Herzlich willkommen!", false,  TtsRequest.Language.DE_DE))
 
-            withContext(Dispatchers.Main)
-            {
-                button_start_tour.isEnabled = false
-                button_start_tour.isClickable = false
-                button_stop_tour.isEnabled = true
-                button_stop_tour.isClickable = true
-            }
-
-            for (location in locations) {
-
-                // Avoid going to home base
-                if (location == "home base") {
-                    continue
-                }
-                if (!isActive) return@launch
-                speakText("On my way to: " + location)
-
-                if (!isActive) return@launch
-                goToLocation(location)
-
-                if (!isActive) return@launch
-                speakText("Arrived to: " + location)
-            }
-
-            withContext(Dispatchers.Main)
-            {
-                button_start_tour.isEnabled = true
-                button_start_tour.isClickable = true
-                button_stop_tour.isEnabled = false
-                button_stop_tour.isClickable = false
-            }
-        }
     }
 
-    private fun stopTour() {
-        GlobalScope.launch(Dispatchers.Default) {
-            if(tour_job != null)
-            {
-                onGoToChannel.trySend(0)
-                onSpeakChannel.trySend(0)
-                tour_job!!.cancel()
-            }
-            withContext(Dispatchers.Main)
-            {
-                button_stop_tour.isEnabled = false
-                button_stop_tour.isClickable = false
-            }
-            robot.stopMovement()
-            speakText("Tour Cancelled for Safety Issues")
-            withContext(Dispatchers.Main)
-            {
-                button_start_tour.isEnabled = true
-                button_start_tour.isClickable = true
-            }
-        }
+    private fun speakEn() {
+        robot.speak(TtsRequest.create("Welcome My Name is TEMI Im happy to be here today and be part of the DiBami Project, Welcome everybody", false, TtsRequest.Language.EN_US))
+
     }
 
     private fun updateView(text:String) {
-        text_view_goal.text = text
+//        text_view_goal.text = text
     }
 
     private fun speakText(text:String, lan: TtsRequest.Language =  TtsRequest.Language.EN_US) {
@@ -554,22 +551,13 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         val jsonString = gson.toJson(TemiStatus(1,statusString, templist))
         ws_speak.getWebSocket().sendText(jsonString)
 
-        // Check For The Status
-        if (ttsRequest.status == TtsRequest.Status.COMPLETED)
-        {
-            onSpeakChannel.trySend(0)
-        }
     }
     override fun onBeWithMeStatusChanged(status: String) {}
     override fun onGoToLocationStatusChanged(location: String, status: String, descriptionId: Int, description: String) {
-
         val templist = mutableListOf<String>()
         val jsonString = gson.toJson(TemiStatus(2,status, templist))
         ws_goto.getWebSocket().sendText(jsonString)
 
-        if (status == "complete") {
-            onGoToChannel.trySend(0)
-        }
     }
     override fun onLocationsUpdated(locations: List<String>) {}
     override fun onConstraintBeWithStatusChanged(isConstraint: Boolean) {}
@@ -596,7 +584,13 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     override fun onLoadMapStatusChanged(status: Int, requestId: String) {}
     override fun onDisabledFeatureListUpdated(disabledFeatureList: List<String>) {}
     override fun onMovementVelocityChanged(velocity: Float) {}
-    override fun onMovementStatusChanged(type: String, status: String) {}
+    override fun onMovementStatusChanged(type: String, status: String) {
+        val templist = mutableListOf<String>()
+        val jsonString = gson.toJson(TemiStatus(3,status, templist))
+        ws_turnby.getWebSocket().sendText(jsonString)
+        Log.d("TurnBy", "Sending Feedback")
+
+    }
     override fun onContinuousFaceRecognized(contactModelList: List<ContactModel>) {}
     override fun cancel() {}
     override fun pause() {}

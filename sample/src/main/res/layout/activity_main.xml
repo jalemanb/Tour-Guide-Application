@@ -19,19 +19,19 @@
             android:layout_centerInParent="true">
 
             <Button
-                android:id="@+id/button_start_tour"
+                android:id="@+id/button_speakDe"
                 android:layout_width="200dp"
                 android:layout_height="200dp"
-                android:text="Start \nTour"
-                android:textSize="50sp"
+                android:text="Sprechen"
+                android:textSize="30sp"
                 android:layout_marginBottom="24dp"/>
 
             <Button
-                android:id="@+id/button_stop_tour"
+                android:id="@+id/button_speakEn"
                 android:layout_width="200dp"
                 android:layout_height="200dp"
-                android:text="Stop \nTour"
-                android:textSize="50sp" />
+                android:text="Speak"
+                android:textSize="30sp" />
 
         </LinearLayout>
 
@@ -43,18 +43,52 @@
         android:orientation="horizontal"
         android:layout_weight="1">
 
-        <TextView
-            android:id="@+id/text_view_goal"
+        <LinearLayout
+            android:id="@+id/top_imgs"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_centerInParent="true"
-            android:textSize="54sp"
-            tools:text="HOLA" />
+            android:orientation="horizontal">
 
-        <TextureView
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:id="@+id/texture_view_cam"/>
+            <ImageView
+                android:id="@+id/unibi_img"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:src="@drawable/unibi"
+                android:layout_marginEnd="10dp"/>
+
+            <ImageView
+                android:id="@+id/citec_img"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:src="@drawable/citec"
+                android:layout_marginLeft="10dp"/>
+
+        </LinearLayout>
+
+<!--        <TextView-->
+<!--            android:id="@+id/text_view_goal"-->
+<!--            android:layout_width="wrap_content"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:layout_centerInParent="true"-->
+<!--            android:textSize="54sp"-->
+<!--            tools:text="HOLA" />-->
+
+        <ImageView
+            android:id="@+id/dibami_img"
+            android:layout_centerHorizontal="true"
+            android:layout_below="@+id/top_imgs"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/dibami" />
+
+
+
+<!--        <TextureView-->
+<!--            android:layout_width="match_parent"-->
+<!--            android:layout_height="match_parent"-->
+<!--            android:id="@+id/texture_view_cam"/>-->
 
     </RelativeLayout>
 
