@@ -117,7 +117,7 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     private lateinit var ws_turnby: WebSocketCom
     private lateinit var ws_tiltangle: WebSocketCom
     private lateinit var ws_follow: WebSocketCom
-
+    private lateinit var ws_tree: WebSocketCom
     private lateinit var ws_hd: WebSocketCom
     private lateinit var ws_rosbridge: WebSocketCom
     private lateinit var ws_mapserver: WebSocketCom
@@ -288,6 +288,9 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
             }
         }
 
+        ws_tree = object : WebSocketCom("ws://$serverIP:8766", 5000) {
+            override fun onCommand(msg:String) { }
+        }
 
         ws_hd =  object : WebSocketCom("ws://$serverIP:8767", 5000) {
             override fun onCommand(msg:String) {
@@ -311,12 +314,7 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         }
 
         ws_mapserver = object : WebSocketCom("ws://$serverIP:8769", 5000) {
-            override fun onCommand(msg:String) {
-                GlobalScope.launch(Dispatchers.IO) {
-                    mutex.withLock {
-                    }
-                }
-            }
+            override fun onCommand(msg:String) { }
         }
 
         val positionScope = CoroutineScope(Dispatchers.IO) // Assuming IO-bound tasks
@@ -534,6 +532,7 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         ws_tiltangle.close()
         ws_follow.close()
         ws_hd.close()
+        ws_tree.close()
 
         ws_rosbridge.close()
         ws_mapserver.close()
@@ -555,8 +554,8 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     }
 
     private fun speakEn() {
-        robot.speak(TtsRequest.create("Welcome My Name is TEMI Im happy to be here today and be part of the DiBami Project, Welcome everybody", false, TtsRequest.Language.EN_US))
-
+        val temiTree = gson.toJson(TemiTree(0, "robot", "My name is Teminator", false, false, false, false))
+        ws_tree.getWebSocket().sendText(temiTree)
     }
 
     private fun speakText(text:String, lan: TtsRequest.Language =  TtsRequest.Language.EN_US) {
