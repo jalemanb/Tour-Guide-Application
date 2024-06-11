@@ -1,6 +1,5 @@
-package com.robotemi.sdk.sample
+package com.robotemi.sdk.sample.utils
 
-import WebSocketCom
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
@@ -16,10 +15,6 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.view.TextureView
 import androidx.core.app.ActivityCompat
-import com.neovisionaries.ws.client.WebSocket
-import com.neovisionaries.ws.client.WebSocketAdapter
-import com.neovisionaries.ws.client.WebSocketExtension
-import com.neovisionaries.ws.client.WebSocketFactory
 
 class CameraDriver(private val context: Context, websocket: WebSocketCom) {
 

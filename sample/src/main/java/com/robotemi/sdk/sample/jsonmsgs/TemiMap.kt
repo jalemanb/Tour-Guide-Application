@@ -1,4 +1,4 @@
-package com.robotemi.sdk.sample
+package com.robotemi.sdk.sample.jsonmsgs
 
 data class TemiMap(var height:Int? = null,
                    var width:Int? = null,

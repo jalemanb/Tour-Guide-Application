@@ -1,4 +1,4 @@
-package com.robotemi.sdk.sample
+package com.robotemi.sdk.sample.jsonmsgs
 
 data class TemiPosition(var x:Float? = null,
                         var y:Float? = null,

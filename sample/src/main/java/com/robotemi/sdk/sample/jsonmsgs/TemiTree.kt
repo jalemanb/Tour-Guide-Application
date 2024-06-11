@@ -1,4 +1,4 @@
-package com.robotemi.sdk.sample
+package com.robotemi.sdk.sample.jsonmsgs
 
 data class TemiTree(var tree: Int? = null,
                     var loc:String? = null,

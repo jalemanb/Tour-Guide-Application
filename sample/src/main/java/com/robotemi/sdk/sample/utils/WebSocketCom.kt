@@ -1,3 +1,5 @@
+package com.robotemi.sdk.sample.utils
+
 import android.util.Log
 import com.neovisionaries.ws.client.*
 import kotlinx.coroutines.*

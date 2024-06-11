@@ -1,23 +1,17 @@
 package com.robotemi.sdk.sample
 
-import WebSocketCom
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
-import android.view.inputmethod.InputMethodManager
 import androidx.annotation.CheckResult
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import com.google.gson.Gson
 import com.robotemi.sdk.*
 import com.robotemi.sdk.Robot.*
 import com.robotemi.sdk.Robot.Companion.getInstance
@@ -38,27 +32,15 @@ import com.robotemi.sdk.navigation.listener.OnDistanceToDestinationChangedListen
 import com.robotemi.sdk.navigation.listener.OnDistanceToLocationChangedListener
 import com.robotemi.sdk.navigation.listener.OnReposeStatusChangedListener
 import com.robotemi.sdk.navigation.model.Position
-import com.robotemi.sdk.navigation.model.SpeedLevel
 import com.robotemi.sdk.permission.OnRequestPermissionResultListener
 import com.robotemi.sdk.permission.Permission
+import com.robotemi.sdk.sample.jsonmsgs.TemiHumanDetection
+import com.robotemi.sdk.sample.jsonmsgs.TemiStatus
+import com.robotemi.sdk.sample.jsonmsgs.TemiTree
 import com.robotemi.sdk.sequence.OnSequencePlayStatusChangedListener
 import com.robotemi.sdk.voice.ITtsService
 import kotlinx.android.synthetic.main.activity_main.*
-import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
-import java.util.concurrent.Executors
-import java.util.concurrent.ScheduledFuture
-import java.util.concurrent.TimeUnit
+
 
 class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     ConversationViewAttachesListener, WakeupWordListener, ActivityStreamPublishListener,
@@ -78,51 +60,9 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
 
     private lateinit var robot: Robot
 
-    private val executorService = Executors.newSingleThreadExecutor()
-
     private var tts: TextToSpeech? = null
 
-    private var debugReceiver: TemiBroadcastReceiver? = null
-
-    private val assistantReceiver = AssistantChangeReceiver()
-
-    private var tour_job: Job? = null
-
-    val scope = CoroutineScope(Dispatchers.Default + CoroutineName("MyScope"))
-
-    val onGoToChannel = Channel<Int>()
-
-    val onSpeakChannel = Channel<Int>()
-
-    val mutex = Mutex()
-
-    val gson = Gson()
-
-    private val positionMutex = Mutex()
-    private val mapMutex = Mutex()
-
-
-    private var temiPosition:Position = Position(0F, 0F, 0F, 0)
-
-    val positionExecutor = Executors.newSingleThreadScheduledExecutor()
-    val mapExecutor = Executors.newSingleThreadScheduledExecutor()
-
-    private lateinit var future_map:ScheduledFuture<*>
-    private lateinit var future_position:ScheduledFuture<*>
-
-    // Websocket client
-    private lateinit var ws_getloc: WebSocketCom
-    private lateinit var ws_speak: WebSocketCom
-    private lateinit var ws_goto: WebSocketCom
-    private lateinit var ws_turnby: WebSocketCom
-    private lateinit var ws_tiltangle: WebSocketCom
-    private lateinit var ws_follow: WebSocketCom
-    private lateinit var ws_tree: WebSocketCom
-    private lateinit var ws_hd: WebSocketCom
-    private lateinit var ws_rosbridge: WebSocketCom
-    private lateinit var ws_mapserver: WebSocketCom
-
-//    private lateinit var cameraService: CameraDriver
+    lateinit var temiros2: ros2interface
 
     @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -131,6 +71,7 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
 
         // Specify an explicit soft input mode to use for the window
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN)
+
         // Initialization Stuff
         verifyStoragePermissions(this)
         robot = getInstance()
@@ -159,11 +100,6 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
             robot.setTtsService(this)
         }
 
-        // Debugging Stuff
-        debugReceiver = TemiBroadcastReceiver()
-        registerReceiver(debugReceiver, IntentFilter(TemiBroadcastReceiver.ACTION_DEBUG))
-        registerReceiver(assistantReceiver, IntentFilter(AssistantChangeReceiver.ACTION_ASSISTANT_SELECTION))
-
         // Get General Permissions Permisssions
         get_permissions()
 
@@ -174,225 +110,62 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         button_speakDe.isEnabled = true
         button_speakDe.isClickable = true
 
-        val serverIP = "10.42.0.1";
-//        val serverIP = "10.0.0.1";
+        val serverIP = "10.42.0.1"; // Control the temi robot from pc
+//        val serverIP = "10.0.0.1"; // Control the temi robot from rpi
 
-        // Websocket configuration
-        ws_getloc = object : WebSocketCom("ws://$serverIP:8760", 5000) {
-            override fun onCommand(msg:String) {
-                GlobalScope.launch(Dispatchers.IO) {
-                    mutex.withLock {
-                        val commandObj = Gson().fromJson(msg, TemiCommand::class.java)
-                        Log.d("WebSocket", "Command Getloc Received")
-                        // Implement Switch stamente for each Robot Capability
-                        when (commandObj.command) {
-                            0 -> getloc_cmd(commandObj)
-                            else -> {
-                                Log.d("WebSocket", "Command Sent is: ${commandObj.command}")
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        temiros2 = ros2interface(serverIP, robot)
 
-
-        ws_speak = object : WebSocketCom("ws://$serverIP:8761", 5000) {
-            override fun onCommand(msg:String) {
-                GlobalScope.launch(Dispatchers.IO) {
-                    mutex.withLock {
-                        val commandObj = Gson().fromJson(msg, TemiCommand::class.java)
-                        Log.d("WebSocket", "Command Speak Received")
-                        // Implement Switch stamente for each Robot Capability
-                        when (commandObj.command) {
-                            1 -> speak_cmd(commandObj)
-                            else -> {
-                                Log.d("WebSocket", "Command Sent is: ${commandObj.command}")
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        ws_goto = object : WebSocketCom("ws://$serverIP:8762", 5000) {
-            override fun onCommand(msg:String) {
-                GlobalScope.launch(Dispatchers.IO) {
-                    mutex.withLock {
-                        val commandObj = Gson().fromJson(msg, TemiCommand::class.java)
-                        Log.d("WebSocket", "Command Goto Received")
-                        // Implement Switch stamente for each Robot Capability
-                        if(!commandObj.flag3)
-                        {
-                            if(commandObj.flag0)
-                            {
-                                gotopos_cmd(commandObj)
-                            }
-                            else
-                            {
-                                goto_cmd(commandObj)
-                            }
-                        }
-                        else
-                        {
-                            stop_cmd(commandObj)
-                        }
-
-                    }
-                }
-            }
-        }
-
-        ws_turnby = object : WebSocketCom("ws://$serverIP:8763", 5000) {
-            override fun onCommand(msg:String) {
-                GlobalScope.launch(Dispatchers.IO) {
-                    mutex.withLock {
-                        val commandObj = Gson().fromJson(msg, TemiCommand::class.java)
-                        Log.d("TurnBy", "Command TurnBy Received")
-                        // Implement Switch stamente for each Robot Capability
-                        turnby_cmd(commandObj)
-                    }
-                }
-            }
-        }
-
-        ws_tiltangle = object : WebSocketCom("ws://$serverIP:8764", 5000) {
-            override fun onCommand(msg:String) {
-                GlobalScope.launch(Dispatchers.IO) {
-                    mutex.withLock {
-                        val commandObj = Gson().fromJson(msg, TemiCommand::class.java)
-                        Log.d("WebSocket", "Command TiltAngle Received")
-                        tiltangle_cmd(commandObj)
-                    }
-                }
-            }
-        }
-
-        ws_follow = object : WebSocketCom("ws://$serverIP:8765", 5000) {
-            override fun onCommand(msg:String) {
-                GlobalScope.launch(Dispatchers.IO) {
-                    mutex.withLock {
-                        val commandObj = Gson().fromJson(msg, TemiCommand::class.java)
-                        Log.d("WebSocket", "Command Follow Received")
-
-                        if(!commandObj.flag3)
-                        {
-                            follow_cmd(commandObj)
-                        }
-                        else
-                        {
-                            stop_cmd(commandObj)
-                        }
-                    }
-                }
-            }
-        }
-
-        ws_tree = object : WebSocketCom("ws://$serverIP:8766", 5000) {
-            override fun onCommand(msg:String) { }
-        }
-
-        ws_hd =  object : WebSocketCom("ws://$serverIP:8767", 5000) {
-            override fun onCommand(msg:String) {
-                GlobalScope.launch(Dispatchers.IO) {
-                    mutex.withLock {
-                    }
-                }
-            }
-        }
-
-        ws_rosbridge = object : WebSocketCom("ws://$serverIP:8768", 5000) {
-            override fun onCommand(msg:String) {
-                GlobalScope.launch(Dispatchers.IO) {
-                    mutex.withLock {
-                        val commandObj = Gson().fromJson(msg, TemiCommand::class.java)
-                        Log.d("WebSocket", "Command Joy_cmd received")
-                        joy_cmd(commandObj)
-                    }
-                }
-            }
-        }
-
-        ws_mapserver = object : WebSocketCom("ws://$serverIP:8769", 5000) {
-            override fun onCommand(msg:String) { }
-        }
-
-        val positionScope = CoroutineScope(Dispatchers.IO) // Assuming IO-bound tasks
-        val mapScope = CoroutineScope(Dispatchers.IO)
-
-        future_position = positionExecutor.scheduleAtFixedRate({
-            positionScope.launch {
-                positionMutex.withLock {
-                    Log.d("PERIODIC", "Pose is: ${temiPosition.x}, ${temiPosition.y}, ${temiPosition.yaw}")
-                    // Get current robot pose and send it to the temi_bridge
-                    val temiPositionJson = gson.toJson(temiPosition)
-                    ws_rosbridge.getWebSocket().sendText(temiPositionJson)
-                }
-            }
-        }, 0, 30, TimeUnit.MILLISECONDS)
-
-        future_map = mapExecutor.scheduleAtFixedRate({
-            mapScope.launch {
-                mapMutex.withLock {
-                    // Get the current map data and send it to the temi_bridge
-                    val currentMap = robot.getMapData()
-                    val temiMapJson = gson.toJson(TemiMap(currentMap!!.mapInfo.height, currentMap.mapInfo.width,
-                        currentMap.mapInfo.originX,  currentMap.mapInfo.originY,
-                        currentMap.mapInfo.resolution, currentMap.mapImage.data))
-                    ws_mapserver.getWebSocket().sendText(temiMapJson)
-                }
-            }
-        }, 0, 1, TimeUnit.SECONDS)
-
-        // Start Camera Streaming
-//        cameraService = CameraDriver(this, ws)
-//        cameraService.start_camera()
     }
-    private fun getloc_cmd(cmd:TemiCommand) {
-        val locations = robot.locations.toMutableList()
-        // The getloc Action is Labeled as 0
-        val statusList = listOf("pending", "started", "processing", "complete")
-        for (statusString in statusList) {
-            val jsonString = gson.toJson(TemiStatus(0,statusString, locations))
-            ws_getloc.getWebSocket().sendText(jsonString)
-            Thread.sleep(100)
+    private fun initOnClickListener() {
+
+        button_speakDe.setOnClickListener { speakDe() }
+        button_speakEn.setOnClickListener { speakEn() }
+    }
+    private fun speakDe() {
+        robot.speak(TtsRequest.create("Willkommen, mein Name ist TEMI. Ich freue mich, heute hier zu sein und Teil des DiBami-Projekts zu sein. Herzlich willkommen!", false,  TtsRequest.Language.DE_DE))
+
+    }
+    private fun speakEn() {
+        temiros2.treeSelect(TemiTree(0, "robot", "My name is Teminator", false, false, false, false))
+    }
+
+    override fun onTtsStatusChanged(ttsRequest: TtsRequest) {
+        // Send The Status
+        var statusString:String? = null
+        when (ttsRequest.status) {
+            TtsRequest.Status.COMPLETED -> statusString = "complete"
+            TtsRequest.Status.PENDING -> statusString = "pending"
+            TtsRequest.Status.PROCESSING -> statusString = "processing"
+            TtsRequest.Status.STARTED -> statusString = "started"
+            TtsRequest.Status.ERROR -> statusString = "error"
+            TtsRequest.Status.NOT_ALLOWED -> statusString = "not_allowed"
+            TtsRequest.Status.CANCELED -> statusString = "cancelled"
+            else -> {
+                Log.d("SpeakStatus", "Invalid Status")
+            }
         }
-    }
-    private fun speak_cmd(cmd:TemiCommand) {
-        robot.speak(TtsRequest.create(cmd.text!!, language = TtsRequest.Language.EN_US, isShowOnConversationLayer = false))
-    }
-    private fun goto_cmd(cmd:TemiCommand) {
-        robot.goTo(cmd.text!!, backwards = false, noBypass = false, SpeedLevel.MEDIUM)
-    }
-    private fun gotopos_cmd(cmd:TemiCommand) {
-        val position: Position = Position(x = cmd.x!!, y = cmd.y!!, yaw = cmd.angle!!)
-        robot.goToPosition( position, backwards = cmd.flag1, noBypass = false, speedLevel = SpeedLevel.MEDIUM)
-    }
-    private fun joy_cmd(cmd:TemiCommand) {
-        robot.skidJoy(cmd.x!!,cmd.y!!, false)
-    }
-    private fun turnby_cmd(cmd:TemiCommand) {
-        robot.turnBy(cmd.angle!!.toInt(), 1.0F)
-    }
-    private fun tiltangle_cmd(cmd:TemiCommand) {
-        robot.tiltAngle(cmd.angle!!.toInt().coerceIn(-25, 55), 0.7F)
-        val statusList = listOf("pending", "started", "processing", "complete")
+
         val templist = mutableListOf<String>()
-        for (statusString in statusList) {
-            val jsonString = gson.toJson(TemiStatus(4,statusString, templist))
-            ws_tiltangle.getWebSocket().sendText(jsonString)
-            Thread.sleep(50)
-        }
-    }
-    private fun follow_cmd(cmd:TemiCommand) {
-        robot.beWithMe()
-    }
+        templist.add("BIELFELD")
 
-    private fun stop_cmd(cmd:TemiCommand)
-    {
-        robot.stopMovement()
-    }
+        // The Speak Action is Labeled as 1
+        temiros2.speakSendStatus(TemiStatus(1,statusString, templist))
 
+    }
+    override fun onGoToLocationStatusChanged(location: String, status: String, descriptionId: Int, description: String) {
+        val templist = mutableListOf<String>()
+        temiros2.goToSendStatus(TemiStatus(2,status, templist))
+
+    }
+    override fun onMovementStatusChanged(type: String, status: String) {
+        val templist = mutableListOf<String>()
+        temiros2.movementSendStatus(TemiStatus(3,status, templist))
+
+    }
+    override fun onBeWithMeStatusChanged(status: String) {
+        val templist = mutableListOf<String>()
+        temiros2.followSendStatus(TemiStatus(5,status, templist))
+    }
     private fun get_permissions() {
         var permissionsLst = mutableListOf<String>()
 
@@ -406,12 +179,7 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
             requestPermissions(permissionsLst.toTypedArray(), 101)
         }
     }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         grantResults.forEach {
             if (it != PackageManager.PERMISSION_GRANTED) {
@@ -419,7 +187,6 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
             }
         }
     }
-
     /**
      * Setting up all the event listeners
      */
@@ -458,7 +225,6 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
                 or View.SYSTEM_UI_FLAG_FULLSCREEN
                 or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
     }
-
     /**
      * Removing the event listeners upon leaving the app.
      */
@@ -504,9 +270,7 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         robot.removeOnMovementStatusChangedListener(this)
         robot.removeOnGreetModeStateChangedListener(this)
         robot.removeOnLoadFloorStatusChangedListener(this)
-        if (!executorService.isShutdown) {
-            executorService.shutdownNow()
-        }
+
         tts?.shutdown()
         val appInfo = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA)
         if (appInfo.metaData != null
@@ -515,100 +279,16 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
             tts = null
             robot.setTtsService(null)
         }
-        if (debugReceiver != null) {
-            unregisterReceiver(debugReceiver)
-        }
 
-        unregisterReceiver(assistantReceiver)
         super.onDestroy()
-
-        // Stop Camera Service
-        // cameraService.stopCamera()
-        // Stop web sockets
-        ws_speak.close()
-        ws_getloc.close()
-        ws_goto.close()
-        ws_turnby.close()
-        ws_tiltangle.close()
-        ws_follow.close()
-        ws_hd.close()
-        ws_tree.close()
-
-        ws_rosbridge.close()
-        ws_mapserver.close()
-
-        future_position.cancel(true)
-        future_map.cancel(true)
-        positionExecutor.shutdown()
+        temiros2.onDestroy()
     }
-
-    private fun initOnClickListener() {
-
-        button_speakDe.setOnClickListener { speakDe() }
-        button_speakEn.setOnClickListener { speakEn() }
-    }
-
-    private fun speakDe() {
-        robot.speak(TtsRequest.create("Willkommen, mein Name ist TEMI. Ich freue mich, heute hier zu sein und Teil des DiBami-Projekts zu sein. Herzlich willkommen!", false,  TtsRequest.Language.DE_DE))
-
-    }
-
-    private fun speakEn() {
-        val temiTree = gson.toJson(TemiTree(0, "robot", "My name is Teminator", false, false, false, false))
-        ws_tree.getWebSocket().sendText(temiTree)
-    }
-
-    private fun speakText(text:String, lan: TtsRequest.Language =  TtsRequest.Language.EN_US) {
-        robot.speak(TtsRequest.create(text, language = lan, isShowOnConversationLayer = false))
-        runBlocking { onSpeakChannel.receive() }
-    }
-
-    private fun goToLocation(location: String) {
-        robot.goTo(location, backwards = false, noBypass = false, SpeedLevel.MEDIUM)
-        runBlocking { onGoToChannel.receive() }
-    }
-
     override fun onUserInteraction(isInteracting: Boolean) {}
     override fun onNlpCompleted(nlpResult: NlpResult) {}
     override fun onRobotReady(isReady: Boolean) {}
     override fun onConversationAttaches(isAttached: Boolean) {}
     override fun onWakeupWord(wakeupWord: String, direction: Int) {}
     override fun onPublish(message: ActivityStreamPublishMessage) {}
-    override fun onTtsStatusChanged(ttsRequest: TtsRequest) {
-        // Send The Status
-        var statusString:String? = null
-        when (ttsRequest.status) {
-            TtsRequest.Status.COMPLETED -> statusString = "complete"
-            TtsRequest.Status.PENDING -> statusString = "pending"
-            TtsRequest.Status.PROCESSING -> statusString = "processing"
-            TtsRequest.Status.STARTED -> statusString = "started"
-            TtsRequest.Status.ERROR -> statusString = "error"
-            TtsRequest.Status.NOT_ALLOWED -> statusString = "not_allowed"
-            TtsRequest.Status.CANCELED -> statusString = "cancelled"
-            else -> {
-                Log.d("SpeakStatus", "Invalid Status")
-            }
-        }
-
-        val templist = mutableListOf<String>()
-        templist.add("BIELFELD")
-
-        // The Speak Action is Labeled as 1
-        val jsonString = gson.toJson(TemiStatus(1,statusString, templist))
-        ws_speak.getWebSocket().sendText(jsonString)
-
-    }
-    override fun onBeWithMeStatusChanged(status: String) {
-        val templist = mutableListOf<String>()
-        val jsonString = gson.toJson(TemiStatus(5,status, templist))
-        ws_follow.getWebSocket().sendText(jsonString)
-    }
-    override fun onGoToLocationStatusChanged(location: String, status: String, descriptionId: Int, description: String) {
-        val templist = mutableListOf<String>()
-        val jsonString = gson.toJson(TemiStatus(2,status, templist))
-        ws_goto.getWebSocket().sendText(jsonString)
-
-    }
     override fun onLocationsUpdated(locations: List<String>) {}
     override fun onConstraintBeWithStatusChanged(isConstraint: Boolean) {}
     override fun onDetectionStateChanged(state: Int) {}
@@ -617,17 +297,35 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     override fun onRequestPermissionResult(permission: Permission, grantResult: Int, requestCode: Int) {}
     override fun onDistanceToLocationChanged(distances: Map<String, Float>) {}
     override fun onCurrentPositionChanged(position: Position) {
-        runBlocking {
-            positionMutex.withLock {
-                temiPosition = position
-            }
-        }
+        temiros2.updatePosition(position)
     }
     override fun onSequencePlayStatusChanged(status: Int) {}
     override fun onRobotLifted(isLifted: Boolean, reason: String) {}
-
+    override fun onDetectionDataChanged(detectionData: DetectionData) {
+        temiros2.sendHumanDetection(TemiHumanDetection(detectionData.angle,
+                                                       detectionData.distance,
+                                                       detectionData.isDetected))
+    }
+    override fun onFaceRecognized(contactModelList: List<ContactModel>) {}
+    override fun onConversationStatusChanged(status: Int, text: String) {}
+    override fun onTtsVisualizerWaveFormDataChanged(waveForm: ByteArray) {}
+    override fun onTtsVisualizerFftDataChanged(fft: ByteArray) {}
+    override fun onReposeStatusChanged(status: Int, description: String) {}
+    override fun onLoadMapStatusChanged(status: Int, requestId: String) {}
+    override fun onDisabledFeatureListUpdated(disabledFeatureList: List<String>) {}
+    override fun onMovementVelocityChanged(velocity: Float) {}
+    override fun onContinuousFaceRecognized(contactModelList: List<ContactModel>) {}
+    override fun cancel() {}
+    override fun pause() {}
+    override fun resume() {}
+    override fun speak(ttsRequest: TtsRequest) {}
+    override fun onGreetModeStateChanged(state: Int) {}
+    override fun onInit(p0: Int) {}
+    override fun onLoadFloorStatusChanged(status: Int) {}
+    override fun onDistanceToDestinationChanged(location: String, distance: Float) {}
+    override fun onSdkError(sdkException: SdkException) {}
+    override fun onRobotDragStateChanged(isDragged: Boolean) {}
     private fun startDetectionWithDistance() {
-        hideKeyboard()
         if (requestPermissionIfNeeded(
                 Permission.SETTINGS,
                 REQUEST_CODE_START_DETECTION_WITH_DISTANCE
@@ -653,42 +351,6 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         robot.requestPermissions(listOf(permission), requestCode)
         return true
     }
-
-    override fun onDetectionDataChanged(detectionData: DetectionData) {
-
-        val angle = detectionData.angle // angle from  the camera to the detected person
-        val distance = detectionData.distance // Distance to the closest detected person
-        val isDetected = detectionData.isDetected // Boolean flag to check if a person is being detected
-        Log.d("detection", angle.toString() +" "+distance.toString()+" "+isDetected.toString())
-
-        val temiHumanDetectionJson = gson.toJson(TemiHumanDetection(angle, distance, isDetected))
-        ws_hd.getWebSocket().sendText(temiHumanDetectionJson)
-    }
-    override fun onFaceRecognized(contactModelList: List<ContactModel>) {}
-    override fun onConversationStatusChanged(status: Int, text: String) {}
-    override fun onTtsVisualizerWaveFormDataChanged(waveForm: ByteArray) {}
-    override fun onTtsVisualizerFftDataChanged(fft: ByteArray) {}
-    override fun onReposeStatusChanged(status: Int, description: String) {}
-    override fun onLoadMapStatusChanged(status: Int, requestId: String) {}
-    override fun onDisabledFeatureListUpdated(disabledFeatureList: List<String>) {}
-    override fun onMovementVelocityChanged(velocity: Float) {}
-    override fun onMovementStatusChanged(type: String, status: String) {
-        val templist = mutableListOf<String>()
-        val jsonString = gson.toJson(TemiStatus(3,status, templist))
-        ws_turnby.getWebSocket().sendText(jsonString)
-
-    }
-    override fun onContinuousFaceRecognized(contactModelList: List<ContactModel>) {}
-    override fun cancel() {}
-    override fun pause() {}
-    override fun resume() {}
-    override fun speak(ttsRequest: TtsRequest) {}
-    override fun onGreetModeStateChanged(state: Int) {}
-    override fun onInit(p0: Int) {}
-    override fun onLoadFloorStatusChanged(status: Int) {}
-    override fun onDistanceToDestinationChanged(location: String, distance: Float) {}
-    override fun onSdkError(sdkException: SdkException) {}
-    override fun onRobotDragStateChanged(isDragged: Boolean) {}
     companion object {
         const val ACTION_HOME_WELCOME = "home.welcome"
         const val ACTION_HOME_DANCE = "home.dance"
@@ -731,13 +393,5 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
                 )
             }
         }
-    }
-    private fun hideKeyboard() {
-        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-        var view = currentFocus
-        if (view == null) {
-            view = View(this)
-        }
-        imm.hideSoftInputFromWindow(view.windowToken, 0)
     }
 }

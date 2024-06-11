@@ -1,4 +1,4 @@
-package com.robotemi.sdk.sample
+package com.robotemi.sdk.sample.jsonmsgs
 
 data class TemiHumanDetection(var angle:Double? = null,
                               var distance:Double? = null,

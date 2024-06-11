@@ -1,4 +1,4 @@
-package com.robotemi.sdk.sample
+package com.robotemi.sdk.sample.jsonmsgs
 
 data class TemiCommand(var command: Int? = null,
                        var text:String? = null,
