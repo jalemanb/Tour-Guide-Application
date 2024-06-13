@@ -3,6 +3,7 @@ package com.robotemi.sdk.sample
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Rect
 import android.os.Bundle
@@ -40,6 +41,7 @@ import com.robotemi.sdk.navigation.listener.OnReposeStatusChangedListener
 import com.robotemi.sdk.navigation.model.Position
 import com.robotemi.sdk.permission.OnRequestPermissionResultListener
 import com.robotemi.sdk.permission.Permission
+import com.robotemi.sdk.sample.guidebehavior.GuideActivity
 import com.robotemi.sdk.sample.jsonmsgs.TemiHumanDetection
 import com.robotemi.sdk.sample.jsonmsgs.TemiStatus
 import com.robotemi.sdk.sample.jsonmsgs.TemiTree
@@ -118,7 +120,7 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
 
         val items = listOf("Guide", "Speak", "Show Services")
 
-        val functionList: List<() -> Unit> = listOf(::speakDe, ::speakDe, ::speakDe)
+        val functionList: List<() -> Unit> = listOf(::locations_menu, ::speakDe, ::speakDe)
 
         val icons = listOf(
             R.drawable.follow_icon,
@@ -159,6 +161,10 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     }
     private fun speakEn() {
         temiros2.treeSelect(TemiTree(0, "robot", "My name is Teminator", false, false, false, false))
+    }
+    private fun locations_menu() {
+        val guideActivityIntent = Intent(this, GuideActivity::class.java)
+        startActivity(guideActivityIntent)
     }
 
     override fun onTtsStatusChanged(ttsRequest: TtsRequest) {

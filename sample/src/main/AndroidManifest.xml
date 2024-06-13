@@ -18,7 +18,10 @@
         android:supportsRtl="true"
         android:theme="@style/SkillTheme"
         tools:ignore="GoogleAppIndexingWarning">
-
+        <activity
+            android:name=".guidebehavior.GuideActivity"
+            android:label="Guide"
+            android:parentActivityName=".MainActivity"/>
         <activity
             android:name=".StartActivity"
             android:configChanges="orientation|keyboardHidden|screenSize"
@@ -31,7 +34,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
         <activity
             android:name=".activity_main_tour"
             android:exported="false" /> <!-- Adding this meta-data is required in order to display this app in temi's launcher app -->
@@ -72,13 +74,6 @@
             android:label="Main"
             android:parentActivityName=".StartActivity" />
 
-        <receiver
-            android:name=".BootCompleteReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.robotemi.intent.action.BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver> <!-- This provider provides face images -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"
