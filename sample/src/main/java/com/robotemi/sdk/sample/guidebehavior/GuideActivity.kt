@@ -18,17 +18,14 @@ class GuideActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_guide)
 
+        titleList = intent.getStringArrayExtra("locations")!!
+
         imageList = arrayOf(
             R.drawable.citec,
             R.drawable.citec,
             R.drawable.citec
             )
 
-        titleList = arrayOf(
-            "Kitchen",
-            "Print",
-            "corridor"
-        )
 
         recyclerView = findViewById(R.id.recycler_view_location)
         recyclerView.layoutManager = LinearLayoutManager(this)
@@ -41,7 +38,7 @@ class GuideActivity : AppCompatActivity() {
 
     private fun getData() {
         for (i in imageList.indices) {
-            val dataClass = DataClass(imageList[i], titleList[i])
+            val dataClass = DataClass(imageList[0], titleList[i])
             dataList.add(dataClass)
         }
         recyclerView.adapter = AdapterClass(dataList)

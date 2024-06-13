@@ -164,6 +164,7 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     }
     private fun locations_menu() {
         val guideActivityIntent = Intent(this, GuideActivity::class.java)
+        guideActivityIntent.putExtra("locations", robot.locations.toTypedArray())
         startActivity(guideActivityIntent)
     }
 
