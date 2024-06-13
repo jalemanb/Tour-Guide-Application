@@ -4,14 +4,20 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.pm.PackageManager
+import android.graphics.Rect
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.util.Log
+import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import androidx.annotation.CheckResult
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import com.nightonke.boommenu.BoomButtons.OnBMClickListener
+import com.nightonke.boommenu.BoomButtons.TextInsideCircleButton
+import com.nightonke.boommenu.BoomMenuButton
+import com.nightonke.boommenu.Util
 import com.robotemi.sdk.*
 import com.robotemi.sdk.Robot.*
 import com.robotemi.sdk.Robot.Companion.getInstance
@@ -103,23 +109,49 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         // Get General Permissions Permisssions
         get_permissions()
 
-        // Enable start tour button assuming the robot start on idle state
-        // Disable stop tour button assuming the root is already stopped at the beginning
-        button_speakEn.isEnabled = true
-        button_speakEn.isClickable = true
-        button_speakDe.isEnabled = true
-        button_speakDe.isClickable = true
-
         val serverIP = "10.42.0.1"; // Control the temi robot from pc
 //        val serverIP = "10.0.0.1"; // Control the temi robot from rpi
 
         temiros2 = ros2interface(serverIP, robot)
 
+        val bmb = findViewById<BoomMenuButton>(R.id.boommenu_button)
+
+        val items = listOf("Guide", "Speak", "Show Services")
+
+        val functionList: List<() -> Unit> = listOf(::speakDe, ::speakDe, ::speakDe)
+
+        val icons = listOf(
+            R.drawable.follow_icon,
+            R.drawable.speak_icon,
+            R.drawable.info_icon
+        )
+
+        for (i in 0 until bmb.piecePlaceEnum.pieceNumber()) {
+            val builder = TextInsideCircleButton.Builder()
+                .buttonRadius(Util.dp2px(120F))
+                .normalImageRes(icons[i]) // Replace with your icon
+                .normalText(items[i])
+                .imageRect(Rect(Util.dp2px(10F), Util.dp2px(-10F), Util.dp2px(230F), Util.dp2px(200F)))
+                .normalText(items[i])
+                .textSize(30)
+                .textGravity(Gravity.CENTER)
+                .textRect(Rect(Util.dp2px(60F), Util.dp2px(180F), Util.dp2px(180F), Util.dp2px(220F)))
+                .listener(object: OnBMClickListener {
+                    override fun onBoomButtonClick(p0: Int) {
+                        functionList[i]()
+                    }
+                })
+
+            bmb.addBuilder(builder)
+        }
+
+        bmb.post {
+            bmb.boom()
+        }
+
     }
     private fun initOnClickListener() {
 
-        button_speakDe.setOnClickListener { speakDe() }
-        button_speakEn.setOnClickListener { speakEn() }
     }
     private fun speakDe() {
         robot.speak(TtsRequest.create("Willkommen, mein Name ist TEMI. Ich freue mich, heute hier zu sein und Teil des DiBami-Projekts zu sein. Herzlich willkommen!", false,  TtsRequest.Language.DE_DE))
