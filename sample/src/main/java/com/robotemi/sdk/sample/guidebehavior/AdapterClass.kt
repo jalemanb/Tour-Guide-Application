@@ -10,7 +10,10 @@ import androidx.recyclerview.widget.RecyclerView
 import com.robotemi.sdk.sample.R
 import kotlinx.android.synthetic.main.item_location.view.text_view_location
 
-class AdapterClass(private val dataList: ArrayList<DataClass>): RecyclerView.Adapter<AdapterClass.ViewHolderClass>() {
+class AdapterClass(private val dataList: ArrayList<DataClass>):
+      RecyclerView.Adapter<AdapterClass.ViewHolderClass>() {
+
+          var onItemClicked: ((DataClass) -> Unit)? = null
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolderClass {
         val itemView = LayoutInflater.from(parent.context).inflate(R.layout.item_location, parent, false)
@@ -21,6 +24,11 @@ class AdapterClass(private val dataList: ArrayList<DataClass>): RecyclerView.Ada
         val currentItem = dataList[position]
         holder.rvImage.setImageResource(currentItem.dataImage)
         holder.rvTitle.text = currentItem.dataTitle
+
+        holder.itemView.setOnClickListener()
+        {
+            onItemClicked?.invoke(currentItem)
+        }
     }
 
     override fun getItemCount(): Int {
