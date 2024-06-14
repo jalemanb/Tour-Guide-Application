@@ -18,10 +18,15 @@
         android:supportsRtl="true"
         android:theme="@style/SkillTheme"
         tools:ignore="GoogleAppIndexingWarning">
+        <service
+            android:name=".TemiListeners"
+            android:enabled="true"
+            android:exported="true"></service>
+
         <activity
             android:name=".guidebehavior.GuideActivity"
             android:label="Guide"
-            android:parentActivityName=".MainActivity"/>
+            android:parentActivityName=".MainActivity" />
         <activity
             android:name=".StartActivity"
             android:configChanges="orientation|keyboardHidden|screenSize"

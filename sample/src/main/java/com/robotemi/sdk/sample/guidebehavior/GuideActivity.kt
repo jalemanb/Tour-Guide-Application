@@ -6,6 +6,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.robotemi.sdk.sample.R
+import com.robotemi.sdk.sample.jsonmsgs.TemiTree
+import com.robotemi.sdk.sample.ros2interface
 
 class GuideActivity : AppCompatActivity() {
 
@@ -38,9 +40,11 @@ class GuideActivity : AppCompatActivity() {
         getData()
 
         locationAdapter.onItemClicked = {
-            Log.d("LOC", "WELCOME : "+it.dataTitle)
-        }
+            val goal_location: String = it.dataTitle
+            Log.d("LOC", "WELCOME : "+goal_location)
+            ros2interface.treeSelect(TemiTree(0, goal_location, "Please Follow Me, I'll take you to the: "+ it.dataTitle+" location", false, false, false, false))
 
+        }
 
 
     }

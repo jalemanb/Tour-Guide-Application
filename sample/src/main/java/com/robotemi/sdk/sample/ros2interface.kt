@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
 
 
-class ros2interface(serverIP: String, bot: Robot) {
+object ros2interface {
 
     lateinit var robot: Robot
 
@@ -51,10 +51,18 @@ class ros2interface(serverIP: String, bot: Robot) {
     private val mapExecutor = Executors.newSingleThreadScheduledExecutor()
     private lateinit var future_map: ScheduledFuture<*>
     private lateinit var future_position: ScheduledFuture<*>
+    private var isReadyFlag = false
 
-    init {
+    fun isReady(): Boolean
+    {
+        return isReadyFlag
+    }
+
+    fun  setup(serverIP: String, bot: Robot) {
 
         robot = bot
+
+        isReadyFlag = true
 
         // Websocket configuration
         ws_getloc = object : WebSocketCom("ws://$serverIP:8760", 5000) {

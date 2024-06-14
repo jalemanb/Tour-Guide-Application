@@ -48,6 +48,8 @@ import com.robotemi.sdk.sample.jsonmsgs.TemiTree
 import com.robotemi.sdk.sequence.OnSequencePlayStatusChangedListener
 import com.robotemi.sdk.voice.ITtsService
 import kotlinx.android.synthetic.main.activity_main.*
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 
 
 class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
@@ -69,8 +71,6 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     private lateinit var robot: Robot
 
     private var tts: TextToSpeech? = null
-
-    lateinit var temiros2: ros2interface
 
     @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -114,7 +114,10 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         val serverIP = "10.42.0.1"; // Control the temi robot from pc
 //        val serverIP = "10.0.0.1"; // Control the temi robot from rpi
 
-        temiros2 = ros2interface(serverIP, robot)
+        if (!(ros2interface.isReady()))
+        {
+            ros2interface.setup(serverIP, robot)
+        }
 
         val bmb = findViewById<BoomMenuButton>(R.id.boommenu_button)
 
@@ -160,9 +163,10 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
 
     }
     private fun speakEn() {
-        temiros2.treeSelect(TemiTree(0, "robot", "My name is Teminator", false, false, false, false))
+        ros2interface.treeSelect(TemiTree(0, "robot", "My name is Teminator", false, false, false, false))
     }
     private fun locations_menu() {
+
         val guideActivityIntent = Intent(this, GuideActivity::class.java)
         guideActivityIntent.putExtra("locations", robot.locations.toTypedArray())
         startActivity(guideActivityIntent)
@@ -188,22 +192,22 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         templist.add("BIELFELD")
 
         // The Speak Action is Labeled as 1
-        temiros2.speakSendStatus(TemiStatus(1,statusString, templist))
+        ros2interface.speakSendStatus(TemiStatus(1,statusString, templist))
 
     }
     override fun onGoToLocationStatusChanged(location: String, status: String, descriptionId: Int, description: String) {
         val templist = mutableListOf<String>()
-        temiros2.goToSendStatus(TemiStatus(2,status, templist))
+        ros2interface.goToSendStatus(TemiStatus(2,status, templist))
 
     }
     override fun onMovementStatusChanged(type: String, status: String) {
         val templist = mutableListOf<String>()
-        temiros2.movementSendStatus(TemiStatus(3,status, templist))
+        ros2interface.movementSendStatus(TemiStatus(3,status, templist))
 
     }
     override fun onBeWithMeStatusChanged(status: String) {
         val templist = mutableListOf<String>()
-        temiros2.followSendStatus(TemiStatus(5,status, templist))
+        ros2interface.followSendStatus(TemiStatus(5,status, templist))
     }
     private fun get_permissions() {
         var permissionsLst = mutableListOf<String>()
@@ -320,7 +324,7 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
         }
 
         super.onDestroy()
-        temiros2.onDestroy()
+//        temiros2.onDestroy()
     }
     override fun onUserInteraction(isInteracting: Boolean) {}
     override fun onNlpCompleted(nlpResult: NlpResult) {}
@@ -336,12 +340,12 @@ class MainActivity : AppCompatActivity(), NlpListener, OnRobotReadyListener,
     override fun onRequestPermissionResult(permission: Permission, grantResult: Int, requestCode: Int) {}
     override fun onDistanceToLocationChanged(distances: Map<String, Float>) {}
     override fun onCurrentPositionChanged(position: Position) {
-        temiros2.updatePosition(position)
+        ros2interface.updatePosition(position)
     }
     override fun onSequencePlayStatusChanged(status: Int) {}
     override fun onRobotLifted(isLifted: Boolean, reason: String) {}
     override fun onDetectionDataChanged(detectionData: DetectionData) {
-        temiros2.sendHumanDetection(TemiHumanDetection(detectionData.angle,
+        ros2interface.sendHumanDetection(TemiHumanDetection(detectionData.angle,
                                                        detectionData.distance,
                                                        detectionData.isDetected))
     }
