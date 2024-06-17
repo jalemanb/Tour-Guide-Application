@@ -1,11 +1,16 @@
 package com.robotemi.sdk.sample.guidebehavior
 
+import android.content.Intent
 import android.os.Bundle
-import android.util.Log
+import android.widget.ImageButton
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.robotemi.sdk.TtsRequest
+import com.robotemi.sdk.sample.MainActivity
 import com.robotemi.sdk.sample.R
+import com.robotemi.sdk.sample.StartActivity
+import com.robotemi.sdk.sample.Temi
 import com.robotemi.sdk.sample.jsonmsgs.TemiTree
 import com.robotemi.sdk.sample.ros2interface
 
@@ -21,6 +26,7 @@ class GuideActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_guide)
 
+
         // Get the Location Names from the Previous Activity
         titleList = intent.getStringArrayExtra("locations")!!
 
@@ -35,17 +41,23 @@ class GuideActivity : AppCompatActivity() {
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.setHasFixedSize(true)
 
-
         dataList = arrayListOf<DataClass>()
         getData()
 
         locationAdapter.onItemClicked = {
             val goal_location: String = it.dataTitle
-            Log.d("LOC", "WELCOME : "+goal_location)
-            ros2interface.treeSelect(TemiTree(0, goal_location, "Please Follow Me, I'll take you to the: "+ it.dataTitle+" location", false, false, false, false))
-
+            ros2interface.treeSelect(TemiTree(0, goal_location.lowercase(), "Please Follow Me, I'll take you to the: "+ it.dataTitle+" location", false, false, false, false))
         }
 
+        Temi.robot.speak(TtsRequest.create("bitte wählen sie aus, wenn ich sie fuhren soll, und ich werde sofort mit der anleitung beginnen", language = TtsRequest.Language.DE_DE, isShowOnConversationLayer = false))
+
+        val backButton: ImageButton = findViewById(R.id.backButton)
+        backButton.setOnClickListener {
+            // Handle the back button click here
+            // For example, finish the activity
+            val backActivityIntent = Intent(this, MainActivity::class.java)
+            startActivity(backActivityIntent)
+        }
 
     }
 

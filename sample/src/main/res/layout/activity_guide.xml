@@ -1,29 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<LinearLayout
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto">
+    android:layout_height="match_parent">
 
-    <RelativeLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:gravity="center">
+    <ImageView
+        android:id="@+id/unibi_img"
+        android:layout_width="300dp"
+        android:layout_height="300dp"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:scaleType="centerInside"
+        android:src="@drawable/unibi" />
 
-        <pl.droidsonroids.gif.GifImageView
-            android:id="@+id/temi_talk1"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:src="@drawable/temi_talk_drawio" />
-    </RelativeLayout>
+    <ImageView
+        android:id="@+id/dibami_img"
+        android:layout_width="300dp"
+        android:layout_height="300dp"
+        android:layout_toRightOf="@+id/unibi_img"
+        android:scaleType="centerInside"
+        android:src="@drawable/dibami" />
+
+    <pl.droidsonroids.gif.GifImageView
+        android:id="@+id/temi_talk1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_centerVertical="true"
+        android:layout_marginLeft="300dp"
+        android:src="@drawable/temi_talk_drawio" />
 
     <androidx.recyclerview.widget.RecyclerView
-        android:layout_height="match_parent"
-        android:layout_width="match_parent"
-        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
         android:id="@+id/recycler_view_location"
-        android:layout_weight="1"/>
+        android:layout_width="700dp"
+        android:layout_height="match_parent"
+        android:layout_alignParentEnd="true"
+        android:layout_centerVertical="true"
+        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
-</LinearLayout>
+    <ImageButton
+        android:id="@+id/backButton"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentBottom="true"
+        android:layout_margin="16dp"
+        android:background="@drawable/circular_button"
+        android:padding="20dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_arrow_back" />
+
+</RelativeLayout>

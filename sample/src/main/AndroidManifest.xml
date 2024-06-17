@@ -18,10 +18,8 @@
         android:supportsRtl="true"
         android:theme="@style/SkillTheme"
         tools:ignore="GoogleAppIndexingWarning">
-        <service
-            android:name=".TemiListeners"
-            android:enabled="true"
-            android:exported="true"></service>
+
+        <service android:name=".TemiListeners" />
 
         <activity
             android:name=".guidebehavior.GuideActivity"

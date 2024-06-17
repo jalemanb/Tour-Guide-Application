@@ -24,10 +24,7 @@ import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
 
-
 object ros2interface {
-
-    lateinit var robot: Robot
 
     // Websocket client
     lateinit var ws_getloc: WebSocketCom
@@ -52,15 +49,14 @@ object ros2interface {
     private lateinit var future_map: ScheduledFuture<*>
     private lateinit var future_position: ScheduledFuture<*>
     private var isReadyFlag = false
-
+    private val serverIP = "10.42.0.1"; // Control the temi robot from pc
+    //        val serverIP = "10.0.0.1"; // Control the temi robot from rpi
     fun isReady(): Boolean
     {
         return isReadyFlag
     }
 
-    fun  setup(serverIP: String, bot: Robot) {
-
-        robot = bot
+    init {
 
         isReadyFlag = true
 
@@ -217,7 +213,7 @@ object ros2interface {
             mapScope.launch {
                 mapMutex.withLock {
                     // Get the current map data and send it to the temi_bridge
-                    val currentMap = robot.getMapData()
+                    val currentMap = Temi.robot.getMapData()
                     val temiMapJson = gson.toJson(
                         TemiMap(currentMap!!.mapInfo.height, currentMap.mapInfo.width,
                             currentMap.mapInfo.originX,  currentMap.mapInfo.originY,
@@ -284,7 +280,6 @@ object ros2interface {
         ws_tree.getWebSocket().sendText(temiTree)
     }
 
-
     fun onDestroy()
     {
         // Stop web sockets
@@ -305,34 +300,32 @@ object ros2interface {
         positionExecutor.shutdown()
     }
 
-
-
     private fun follow_cmd(cmd: TemiCommand) {
-        robot.beWithMe()
+        Temi.robot.beWithMe()
     }
 
     private fun stop_cmd(cmd: TemiCommand)
     {
-        robot.stopMovement()
+        Temi.robot.stopMovement()
     }
     private fun speak_cmd(cmd: TemiCommand) {
-        robot.speak(TtsRequest.create(cmd.text!!, language = TtsRequest.Language.EN_US, isShowOnConversationLayer = false))
+        Temi.robot.speak(TtsRequest.create(cmd.text!!, language = TtsRequest.Language.EN_US, isShowOnConversationLayer = false))
     }
     private fun goto_cmd(cmd: TemiCommand) {
-        robot.goTo(cmd.text!!, backwards = false, noBypass = false, SpeedLevel.MEDIUM)
+        Temi.robot.goTo(cmd.text!!, backwards = cmd.flag1, noBypass = false, SpeedLevel.MEDIUM)
     }
     private fun gotopos_cmd(cmd: TemiCommand) {
         val position: Position = Position(x = cmd.x!!, y = cmd.y!!, yaw = cmd.angle!!)
-        robot.goToPosition( position, backwards = cmd.flag1, noBypass = false, speedLevel = SpeedLevel.MEDIUM)
+        Temi.robot.goToPosition( position, backwards = cmd.flag1, noBypass = false, speedLevel = SpeedLevel.MEDIUM)
     }
     private fun joy_cmd(cmd: TemiCommand) {
-        robot.skidJoy(cmd.x!!,cmd.y!!, false)
+        Temi.robot.skidJoy(cmd.x!!,cmd.y!!, false)
     }
     private fun turnby_cmd(cmd: TemiCommand) {
-        robot.turnBy(cmd.angle!!.toInt(), 1.0F)
+        Temi.robot.turnBy(cmd.angle!!.toInt(), 1.0F)
     }
     private fun getloc_cmd(cmd: TemiCommand) {
-        val locations = robot.locations.toMutableList()
+        val locations = Temi.robot.locations.toMutableList()
         // The getloc Action is Labeled as 0
         val statusList = listOf("pending", "started", "processing", "complete")
         for (statusString in statusList) {
@@ -342,7 +335,7 @@ object ros2interface {
     }
 
     private fun tiltangle_cmd(cmd: TemiCommand) {
-        robot.tiltAngle(cmd.angle!!.toInt().coerceIn(-25, 55), 0.7F)
+        Temi.robot.tiltAngle(cmd.angle!!.toInt().coerceIn(-25, 55), 0.7F)
         val statusList = listOf("pending", "started", "processing", "complete")
         val templist = mutableListOf<String>()
         for (statusString in statusList) {

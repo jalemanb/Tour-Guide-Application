@@ -24,6 +24,7 @@ class StartActivity : AppCompatActivity() {
     private lateinit var fullscreenContent: TextView
     private lateinit var fullscreenContentControls: LinearLayout
     private val hideHandler = Handler(Looper.myLooper()!!)
+    private var serviceStarted: Boolean = false
 
     @SuppressLint("InlinedApi")
     private val hidePart2Runnable = Runnable {
@@ -74,6 +75,10 @@ class StartActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Put TEMi head on 45 degrees so its easy to detect a human
+        Temi.robot.tiltAngle(45, 0.7F)
+
+
         binding = ActivityStartBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -92,6 +97,14 @@ class StartActivity : AppCompatActivity() {
         // operations to prevent the jarring behavior of controls going away
         // while interacting with the UI.
         binding.dummyButton.setOnTouchListener(delayHideTouchListener)
+
+        if(!serviceStarted)
+        {
+            val serviceIntent = Intent(this, TemiListeners::class.java)
+            startService(serviceIntent)
+            serviceStarted = true
+        }
+
     }
 
     override fun onPostCreate(savedInstanceState: Bundle?) {
