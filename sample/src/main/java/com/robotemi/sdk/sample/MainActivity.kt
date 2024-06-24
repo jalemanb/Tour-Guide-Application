@@ -7,18 +7,27 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Rect
 import android.os.Bundle
+import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageButton
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.transition.Slide
+import androidx.transition.TransitionManager
 import com.nightonke.boommenu.BoomButtons.OnBMClickListener
 import com.nightonke.boommenu.BoomButtons.TextInsideCircleButton
 import com.nightonke.boommenu.BoomMenuButton
+import com.nightonke.boommenu.OnBoomListenerAdapter
 import com.nightonke.boommenu.Util
 import com.robotemi.sdk.TtsRequest
 import com.robotemi.sdk.sample.guidebehavior.GuideActivity
+import kotlinx.android.synthetic.main.activity_main.temi_talk1
+import kotlinx.android.synthetic.main.activity_main.boom_relative_layout
+import kotlinx.android.synthetic.main.activity_main.unibi_img
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 
 class MainActivity :  AppCompatActivity() {
 
@@ -33,6 +42,7 @@ class MainActivity :  AppCompatActivity() {
         // Get General Permissions Permisssions
         verifyStoragePermissions(this)
         get_permissions()
+
 
         val bmb = findViewById<BoomMenuButton>(R.id.boommenu_button)
 
@@ -65,9 +75,30 @@ class MainActivity :  AppCompatActivity() {
             bmb.addBuilder(builder)
         }
 
+        bmb.onBoomListener = object : OnBoomListenerAdapter() {
+
+            override fun onBoomDidHide() {
+                val mSlideLeft = Slide()
+                mSlideLeft.slideEdge = Gravity.START
+                TransitionManager.beginDelayedTransition(boom_relative_layout, mSlideLeft)
+                temi_talk1.visibility = View.VISIBLE
+            }
+
+            override fun onBoomWillShow() {
+                temi_talk1.visibility = View.INVISIBLE
+            }
+
+        }
+
+        Thread.sleep(200)
+
         bmb.post {
             bmb.boom()
         }
+
+
+
+
 
 
         Temi.robot.speak(TtsRequest.create("Wie kann ich Ihnen heute helfen", language = TtsRequest.Language.DE_DE, isShowOnConversationLayer = false))
@@ -80,15 +111,18 @@ class MainActivity :  AppCompatActivity() {
             startActivity(backActivityIntent)
         }
 
-
-
     }
 
     private fun locations_menu() {
 
         val guideActivityIntent = Intent(this, GuideActivity::class.java)
         guideActivityIntent.putExtra("locations", Temi.robot.locations.toTypedArray())
-        startActivity(guideActivityIntent)
+
+        GlobalScope.launch {
+            Thread.sleep(350)
+            startActivity(guideActivityIntent)
+        }
+
     }
 
     /**

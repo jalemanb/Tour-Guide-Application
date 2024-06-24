@@ -3,7 +3,8 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="24dp">
+    android:padding="24dp"
+    android:id="@+id/boom_relative_layout">
 
     <!--    <RelativeLayout-->
     <!--        android:layout_width="0dp"-->
@@ -78,18 +79,14 @@
         android:src="@drawable/ic_arrow_back" />
 
 
-    <!--    <RelativeLayout-->
-    <!--        android:layout_width="0dp"-->
-    <!--        android:layout_height="match_parent"-->
-    <!--        android:layout_weight="1">-->
-
-    <!--        <ImageView-->
-    <!--            android:id="@+id/dibami_img"-->
-    <!--            android:layout_centerHorizontal="true"-->
-    <!--            android:layout_width="wrap_content"-->
-    <!--            android:layout_height="wrap_content"-->
-    <!--            android:src="@drawable/dibami" />-->
-
-    <!--    </RelativeLayout>-->
+    <pl.droidsonroids.gif.GifImageView
+        android:id="@+id/temi_talk1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginLeft="300dp"
+        android:visibility="invisible"
+        android:src="@drawable/temi_talk_menu_drawio" />
 
 </RelativeLayout>

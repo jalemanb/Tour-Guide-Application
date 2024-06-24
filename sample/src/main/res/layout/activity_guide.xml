@@ -3,7 +3,8 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:id="@+id/guide_relative_layout">
 
     <ImageView
         android:id="@+id/unibi_img"
@@ -23,7 +24,7 @@
         android:src="@drawable/dibami" />
 
     <pl.droidsonroids.gif.GifImageView
-        android:id="@+id/temi_talk1"
+        android:id="@+id/temi_talk_guide"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentStart="true"

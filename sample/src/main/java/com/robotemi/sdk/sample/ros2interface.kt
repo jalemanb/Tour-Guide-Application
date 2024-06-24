@@ -50,7 +50,7 @@ object ros2interface {
     private lateinit var future_position: ScheduledFuture<*>
     private var isReadyFlag = false
     private val serverIP = "10.42.0.1"; // Control the temi robot from pc
-    //        val serverIP = "10.0.0.1"; // Control the temi robot from rpi
+//            val serverIP = "10.0.0.1"; // Control the temi robot from rpi
     fun isReady(): Boolean
     {
         return isReadyFlag

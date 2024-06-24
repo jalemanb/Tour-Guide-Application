@@ -2,17 +2,22 @@ package com.robotemi.sdk.sample.guidebehavior
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.Gravity
+import android.view.View
 import android.widget.ImageButton
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.transition.Slide
+import androidx.transition.TransitionManager
 import com.robotemi.sdk.TtsRequest
 import com.robotemi.sdk.sample.MainActivity
 import com.robotemi.sdk.sample.R
-import com.robotemi.sdk.sample.StartActivity
 import com.robotemi.sdk.sample.Temi
 import com.robotemi.sdk.sample.jsonmsgs.TemiTree
 import com.robotemi.sdk.sample.ros2interface
+import kotlinx.android.synthetic.main.activity_guide.guide_relative_layout
+import kotlinx.android.synthetic.main.activity_guide.temi_talk_guide
 
 class GuideActivity : AppCompatActivity() {
 
@@ -51,10 +56,9 @@ class GuideActivity : AppCompatActivity() {
 
         Temi.robot.speak(TtsRequest.create("bitte wählen sie aus, wenn ich sie fuhren soll, und ich werde sofort mit der anleitung beginnen", language = TtsRequest.Language.DE_DE, isShowOnConversationLayer = false))
 
+
         val backButton: ImageButton = findViewById(R.id.backButton)
         backButton.setOnClickListener {
-            // Handle the back button click here
-            // For example, finish the activity
             val backActivityIntent = Intent(this, MainActivity::class.java)
             startActivity(backActivityIntent)
         }
