@@ -265,11 +265,16 @@ class TemiListeners : Service(), Robot.NlpListener, OnRobotReadyListener,
     override fun onSequencePlayStatusChanged(status: Int) {}
     override fun onRobotLifted(isLifted: Boolean, reason: String) {}
     override fun onDetectionDataChanged(detectionData: DetectionData) {
+
         ros2interface.sendHumanDetection(
             TemiHumanDetection(detectionData.angle,
             detectionData.distance,
             detectionData.isDetected)
         )
+
+        HumanDectection.angle = detectionData.angle.toFloat()
+        HumanDectection.distance = detectionData.distance.toFloat()
+        HumanDectection.is_detection = detectionData.isDetected
     }
     override fun onFaceRecognized(contactModelList: List<ContactModel>) {}
     override fun onConversationStatusChanged(status: Int, text: String) {}
@@ -298,7 +303,7 @@ class TemiListeners : Service(), Robot.NlpListener, OnRobotReadyListener,
         ) {
             return
         }
-        var distanceStr = "1.8"
+        var distanceStr = "1.7"
         if (distanceStr.isEmpty()) distanceStr = "0"
         try {
             val distance = distanceStr.toFloat()
@@ -316,7 +321,6 @@ class TemiListeners : Service(), Robot.NlpListener, OnRobotReadyListener,
         Temi.robot.requestPermissions(listOf(permission), requestCode)
         return true
     }
-
 
     companion object {
         const val ACTION_HOME_WELCOME = "home.welcome"

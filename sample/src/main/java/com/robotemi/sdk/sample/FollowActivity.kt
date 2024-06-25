@@ -8,28 +8,26 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.View
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.robotemi.sdk.sample.databinding.ActivityStartBinding
-import pl.droidsonroids.gif.GifImageView
+import com.robotemi.sdk.TtsRequest
+import com.robotemi.sdk.sample.databinding.ActivityFollowBinding
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
  * status bar and navigation/system bar) with user interaction.
  */
-class StartActivity : AppCompatActivity() {
+class FollowActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivityStartBinding
+    private lateinit var binding: ActivityFollowBinding
     private lateinit var fullscreenContent: TextView
     private lateinit var fullscreenContentControls: LinearLayout
     private var serviceStarted: Boolean = false
     private var isFullscreen: Boolean = false
     private lateinit var leftPupil: View
     private lateinit var rightPupil: View
-    private lateinit var talking_mouth: GifImageView
-    private lateinit var smiling_mouth: ImageView
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var runnable: Runnable
 
@@ -43,19 +41,27 @@ class StartActivity : AppCompatActivity() {
 
         // Put TEMi head on 45 degrees so its easy to detect a human
         Temi.robot.tiltAngle(45, 0.7F)
+        Temi.robot.beWithMe()
+        Temi.robot.speak(TtsRequest.create("Ich werde dir folgen, wohin du auch gehst. Wenn Sie möchten, dass ich aufhöre, berühren Sie bitte den Bildschirm", language = TtsRequest.Language.DE_DE, isShowOnConversationLayer = false))
 
         //////////////////////////////////////////////////////////////////////////
         //////////////////////////////////////////////////////////////////////////
-        binding = ActivityStartBinding.inflate(layoutInflater)
+        binding = ActivityFollowBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        Log.d("follow", "one")
 
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
         isFullscreen = true
 
+        Log.d("follow", "two")
+
         // Set up the user interaction to manually show or hide the system UI.
         fullscreenContent = binding.fullscreenContent
         fullscreenContent.setOnClickListener { start_service() }
+
+        Log.d("follow", "three")
 
         fullscreenContentControls = binding.fullscreenContentControls
 
@@ -67,12 +73,13 @@ class StartActivity : AppCompatActivity() {
         }
         //////////////////////////////////////////////////////////////////////////
         //////////////////////////////////////////////////////////////////////////
-
+        Log.d("follow", "four")
         leftPupil = findViewById(R.id.leftPupil)
         rightPupil = findViewById(R.id.rightPupil)
 
-        talking_mouth = findViewById(R.id.welcome_gif)
-        smiling_mouth = findViewById(R.id.smile_image_view)
+
+
+        Log.d("follow", "five")
 
         // Define the runnable
         runnable = Runnable {
@@ -80,33 +87,11 @@ class StartActivity : AppCompatActivity() {
             angle = HumanDectection.angle
             is_human_detected = HumanDectection.is_detection
 
-            if (distance < 1F && is_human_detected)
-            {
-                show_dialog(true)
-            }
-            else
-            {
-                show_dialog(false)
-            }
-
             // Your repeated task here
             movePupilsToAngle(angle) // Example: move to a random angle
 //            movePupilsToAngle((0..360).random().toFloat()) // Example: move to a random angle
-            handler.postDelayed(runnable, 500) // Schedule the runnable to run again in 1 second
+            handler.postDelayed(runnable, 400) // Schedule the runnable to run again in 1 second
         }
-    }
-
-    fun show_dialog(activate: Boolean) {
-
-        if(activate){
-            talking_mouth.visibility = View.VISIBLE
-            smiling_mouth.visibility = View.INVISIBLE
-        }
-        else{
-            talking_mouth.visibility = View.INVISIBLE
-            smiling_mouth.visibility = View.VISIBLE
-        }
-
     }
 
     override fun onStart() {
@@ -145,16 +130,17 @@ class StartActivity : AppCompatActivity() {
 
     override fun onPostCreate(savedInstanceState: Bundle?) {
         super.onPostCreate(savedInstanceState)
-
     }
 
     private fun start_service()
     {
+        Temi.robot.stopMovement()
         val mainActivityIntent = Intent(this, MainActivity::class.java)
         startActivity(mainActivityIntent)
     }
 
     companion object {
+
         /**
          * Whether or not the system UI should be auto-hidden after
          * [AUTO_HIDE_DELAY_MILLIS] milliseconds.

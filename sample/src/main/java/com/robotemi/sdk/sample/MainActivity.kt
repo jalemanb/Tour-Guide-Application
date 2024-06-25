@@ -46,9 +46,9 @@ class MainActivity :  AppCompatActivity() {
 
         val bmb = findViewById<BoomMenuButton>(R.id.boommenu_button)
 
-        val items = listOf("Guide", "Speak", "Show Services")
+        val items = listOf("Guide", "Follow", "Show Services")
 
-        val functionList: List<() -> Unit> = listOf(::locations_menu, ::locations_menu, ::locations_menu)
+        val functionList: List<() -> Unit> = listOf(::locations_menu, ::following_mode, ::locations_menu)
 
         val icons = listOf(
             R.drawable.follow_icon,
@@ -96,11 +96,6 @@ class MainActivity :  AppCompatActivity() {
             bmb.boom()
         }
 
-
-
-
-
-
         Temi.robot.speak(TtsRequest.create("Wie kann ich Ihnen heute helfen", language = TtsRequest.Language.DE_DE, isShowOnConversationLayer = false))
 
         val backButton: ImageButton = findViewById(R.id.backButton)
@@ -110,7 +105,6 @@ class MainActivity :  AppCompatActivity() {
             val backActivityIntent = Intent(this, StartActivity::class.java)
             startActivity(backActivityIntent)
         }
-
     }
 
     private fun locations_menu() {
@@ -121,6 +115,17 @@ class MainActivity :  AppCompatActivity() {
         GlobalScope.launch {
             Thread.sleep(350)
             startActivity(guideActivityIntent)
+        }
+
+    }
+
+    private fun following_mode() {
+
+        val followActivityIntent = Intent(this, FollowActivity::class.java)
+
+        GlobalScope.launch {
+            Thread.sleep(350)
+            startActivity(followActivityIntent)
         }
 
     }

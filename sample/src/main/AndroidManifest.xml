@@ -18,6 +18,12 @@
         android:supportsRtl="true"
         android:theme="@style/SkillTheme"
         tools:ignore="GoogleAppIndexingWarning">
+        <activity
+            android:name=".FollowActivity"
+            android:configChanges="orientation|keyboardHidden|screenSize"
+            android:exported="false"
+            android:label="@string/title_activity_follow"
+            android:theme="@style/SkillTheme.Fullscreen" />
 
         <service android:name=".TemiListeners" />
 

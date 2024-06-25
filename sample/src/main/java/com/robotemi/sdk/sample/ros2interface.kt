@@ -333,7 +333,6 @@ object ros2interface {
             Thread.sleep(100)
         }
     }
-
     private fun tiltangle_cmd(cmd: TemiCommand) {
         Temi.robot.tiltAngle(cmd.angle!!.toInt().coerceIn(-25, 55), 0.7F)
         val statusList = listOf("pending", "started", "processing", "complete")
