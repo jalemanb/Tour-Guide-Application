@@ -12,6 +12,7 @@ import androidx.transition.Slide
 import androidx.transition.TransitionManager
 import com.robotemi.sdk.TtsRequest
 import com.robotemi.sdk.sample.MainActivity
+import com.robotemi.sdk.sample.MapActivity
 import com.robotemi.sdk.sample.R
 import com.robotemi.sdk.sample.Temi
 import com.robotemi.sdk.sample.jsonmsgs.TemiTree
@@ -52,6 +53,8 @@ class GuideActivity : AppCompatActivity() {
         locationAdapter.onItemClicked = {
             val goal_location: String = it.dataTitle
             ros2interface.treeSelect(TemiTree(0, goal_location.lowercase(), "Please Follow Me, I'll take you to the: "+ it.dataTitle+" location", false, false, false, false))
+            val mapActivityIntent = Intent(this, MapActivity::class.java)
+            startActivity(mapActivityIntent)
         }
 
         Temi.robot.speak(TtsRequest.create("bitte wählen sie aus, wenn ich sie fuhren soll, und ich werde sofort mit der anleitung beginnen", language = TtsRequest.Language.DE_DE, isShowOnConversationLayer = false))
