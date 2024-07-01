@@ -39,29 +39,21 @@ class FollowActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Put TEMi head on 45 degrees so its easy to detect a human
-        Temi.robot.tiltAngle(45, 0.7F)
-        Temi.robot.beWithMe()
-        Temi.robot.speak(TtsRequest.create("Ich werde dir folgen, wohin du auch gehst. Wenn Sie möchten, dass ich aufhöre, berühren Sie bitte den Bildschirm", language = TtsRequest.Language.DE_DE, isShowOnConversationLayer = false))
+        // Initialize Temi to follow a Human
+        followInit()
 
         //////////////////////////////////////////////////////////////////////////
         //////////////////////////////////////////////////////////////////////////
         binding = ActivityFollowBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        Log.d("follow", "one")
-
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
         isFullscreen = true
 
-        Log.d("follow", "two")
-
         // Set up the user interaction to manually show or hide the system UI.
         fullscreenContent = binding.fullscreenContent
         fullscreenContent.setOnClickListener { start_service() }
-
-        Log.d("follow", "three")
 
         fullscreenContentControls = binding.fullscreenContentControls
 
@@ -73,25 +65,27 @@ class FollowActivity : AppCompatActivity() {
         }
         //////////////////////////////////////////////////////////////////////////
         //////////////////////////////////////////////////////////////////////////
-        Log.d("follow", "four")
         leftPupil = findViewById(R.id.leftPupil)
         rightPupil = findViewById(R.id.rightPupil)
 
 
-
-        Log.d("follow", "five")
-
         // Define the runnable
         runnable = Runnable {
+            // Get Human Detection Distance
             distance = HumanDectection.distance
             angle = HumanDectection.angle
             is_human_detected = HumanDectection.is_detection
-
             // Your repeated task here
-            movePupilsToAngle(angle) // Example: move to a random angle
-//            movePupilsToAngle((0..360).random().toFloat()) // Example: move to a random angle
+            movePupilsToAngle(angle)
             handler.postDelayed(runnable, 400) // Schedule the runnable to run again in 1 second
         }
+    }
+
+    private fun followInit() {
+        // Put TEMi head on 45 degrees so its easy to detect a human
+        Temi.robot.tiltAngle(45, 0.7F)
+        Temi.robot.beWithMe()
+        Temi.robot.speak(TtsRequest.create("Ich werde dir folgen, wohin du auch gehst. Wenn Sie möchten, dass ich aufhöre, berühren Sie bitte den Bildschirm", language = TtsRequest.Language.DE_DE, isShowOnConversationLayer = false))
     }
 
     override fun onStart() {

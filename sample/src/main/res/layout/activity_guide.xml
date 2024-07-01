@@ -27,10 +27,18 @@
         android:id="@+id/temi_talk_guide"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentStart="true"
         android:layout_centerVertical="true"
-        android:layout_marginLeft="300dp"
+        android:layout_marginLeft="100dp"
         android:src="@drawable/temi_talk_drawio" />
+
+    <ImageView
+        android:id="@+id/person_detected_image_view"
+        android:layout_width="500dp"
+        android:layout_height="500dp"
+        android:layout_toRightOf="@+id/temi_talk_guide"
+        android:scaleType="centerInside"
+        android:layout_centerVertical="true"
+        android:src="@drawable/nopersondetectedde_drawio" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_view_location"
