@@ -12,6 +12,7 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.robotemi.sdk.navigation.model.SpeedLevel
 import com.robotemi.sdk.sample.databinding.ActivityStartBinding
 import pl.droidsonroids.gif.GifImageView
 

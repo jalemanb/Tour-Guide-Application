@@ -2,13 +2,14 @@ package com.robotemi.sdk.sample
 
 import android.util.Log
 import com.google.gson.Gson
-import com.robotemi.sdk.Robot
 import com.robotemi.sdk.TtsRequest
 import com.robotemi.sdk.navigation.model.Position
 import com.robotemi.sdk.navigation.model.SpeedLevel
 import com.robotemi.sdk.sample.jsonmsgs.TemiCommand
+import com.robotemi.sdk.sample.jsonmsgs.TemiCurrentAction
 import com.robotemi.sdk.sample.jsonmsgs.TemiHumanDetection
 import com.robotemi.sdk.sample.jsonmsgs.TemiMap
+import com.robotemi.sdk.sample.jsonmsgs.TemiState
 import com.robotemi.sdk.sample.jsonmsgs.TemiStatus
 import com.robotemi.sdk.sample.jsonmsgs.TemiTree
 import com.robotemi.sdk.sample.utils.WebSocketCom
@@ -22,43 +23,51 @@ import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.runBlocking
+import java.sql.Timestamp
 
 object ros2interface {
 
     // Websocket client
-    lateinit var ws_getloc: WebSocketCom
-    lateinit var ws_speak: WebSocketCom
-    lateinit var ws_goto: WebSocketCom
-    lateinit var ws_turnby: WebSocketCom
-    lateinit var ws_tiltangle: WebSocketCom
-    lateinit var ws_follow: WebSocketCom
-    lateinit var ws_tree: WebSocketCom
-    lateinit var ws_hd: WebSocketCom
-    lateinit var ws_rosbridge: WebSocketCom
-    lateinit var ws_mapserver: WebSocketCom
+    var ws_getloc: WebSocketCom
+    var ws_speak: WebSocketCom
+    var ws_goto: WebSocketCom
+    var ws_turnby: WebSocketCom
+    var ws_tiltangle: WebSocketCom
+    var ws_follow: WebSocketCom
+    var ws_tree: WebSocketCom
+    var ws_hd: WebSocketCom
+    var ws_rosbridge: WebSocketCom
+    var ws_mapserver: WebSocketCom
+    var ws_loggerserver: WebSocketCom
 
     val gson = Gson()
 
     private val mutex = Mutex()
     private val positionMutex = Mutex()
     private val mapMutex = Mutex()
+    private val loggerMutex = Mutex()
     private var temiPosition: Position = Position(0F, 0F, 0F, 0)
+    private var temiState: TemiState = TemiState("", 0, false, "")
     private val positionExecutor = Executors.newSingleThreadScheduledExecutor()
     private val mapExecutor = Executors.newSingleThreadScheduledExecutor()
-    private lateinit var future_map: ScheduledFuture<*>
-    private lateinit var future_position: ScheduledFuture<*>
-    private var isReadyFlag = false
+    private val loggerExecutor = Executors.newSingleThreadScheduledExecutor()
+    private var future_map: ScheduledFuture<*>
+    private var future_position: ScheduledFuture<*>
+    private var future_logger: ScheduledFuture<*>
 //    private val serverIP = "10.42.0.1"; // Control the temi robot from pc
-    private val serverIP = "10.0.0.1"; // Control the temi robot from rpi
-    fun isReady(): Boolean
-    {
-        return isReadyFlag
-    }
+    private val serverIP = "10.0.0.1"; // Control the temi robot from edge device
 
     init {
+        // setting up requied scopes for synchronous tasks
+        val positionScope = CoroutineScope(Dispatchers.IO) // Assuming IO-bound tasks
+        val mapScope = CoroutineScope(Dispatchers.IO)
+        val loggerScope = CoroutineScope(Dispatchers.IO)
 
-        isReadyFlag = true
+        // Initializing the temistate obeject to default initial values
+        val timeStamp = Timestamp(System.currentTimeMillis())
+        temiState.timestamp = timeStamp.toString()
+        temiState.action = "none"
+
 
         // Websocket configuration
         ws_getloc = object : WebSocketCom("ws://$serverIP:8760", 5000) {
@@ -195,13 +204,13 @@ object ros2interface {
             override fun onCommand(msg:String) { }
         }
 
-        val positionScope = CoroutineScope(Dispatchers.IO) // Assuming IO-bound tasks
-        val mapScope = CoroutineScope(Dispatchers.IO)
+        ws_loggerserver = object : WebSocketCom("ws://$serverIP:8770", 5000) {
+            override fun onCommand(msg:String) { }
+        }
 
         future_position = positionExecutor.scheduleAtFixedRate({
             positionScope.launch {
                 positionMutex.withLock {
-                    Log.d("PERIODIC", "Pose is: ${temiPosition.x}, ${temiPosition.y}, ${temiPosition.yaw}")
                     // Get current robot pose and send it to the temi_bridge
                     val temiPositionJson = gson.toJson(temiPosition)
                     ws_rosbridge.getWebSocket().sendText(temiPositionJson)
@@ -223,6 +232,26 @@ object ros2interface {
                 }
             }
         }, 0, 1, TimeUnit.SECONDS)
+
+        future_logger = loggerExecutor.scheduleAtFixedRate({
+            loggerScope.launch {
+                loggerMutex.withLock {
+
+                    val timeStamp = Timestamp(System.currentTimeMillis())
+                    temiState.timestamp = timeStamp.toString()
+                    temiState.soc = Temi.robot.batteryData!!.level
+                    temiState.isCharging = Temi.robot.batteryData!!.isCharging
+                    temiState.action = TemiCurrentAction.name
+
+                    // Get current robot pose and send it to the temi_bridge
+                    val temiStateJson = gson.toJson(temiState)
+//                    Log.d("Periodic", temiStateJson)
+
+                    ws_loggerserver.getWebSocket().sendText(temiStateJson)
+                }
+            }
+        }, 0, 100, TimeUnit.MILLISECONDS)
+
     }
 
     fun getLocSendStatus(status: TemiStatus)
@@ -294,10 +323,14 @@ object ros2interface {
 
         ws_rosbridge.close()
         ws_mapserver.close()
+        ws_loggerserver.close()
 
         future_position.cancel(true)
         future_map.cancel(true)
+        future_logger.cancel(true)
         positionExecutor.shutdown()
+        mapExecutor.shutdown()
+        loggerExecutor.shutdown()
     }
 
     private fun follow_cmd(cmd: TemiCommand) {

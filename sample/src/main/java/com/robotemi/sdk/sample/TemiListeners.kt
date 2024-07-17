@@ -50,6 +50,7 @@ import com.robotemi.sdk.navigation.listener.OnReposeStatusChangedListener
 import com.robotemi.sdk.navigation.model.Position
 import com.robotemi.sdk.permission.OnRequestPermissionResultListener
 import com.robotemi.sdk.permission.Permission
+import com.robotemi.sdk.sample.jsonmsgs.TemiCurrentAction
 import com.robotemi.sdk.sample.jsonmsgs.TemiHumanDetection
 import com.robotemi.sdk.sample.jsonmsgs.TemiStatus
 import com.robotemi.sdk.sequence.OnSequencePlayStatusChangedListener
@@ -225,10 +226,26 @@ class TemiListeners : Service(), Robot.NlpListener, OnRobotReadyListener,
         // The Speak Action is Labeled as 1
         ros2interface.speakSendStatus(TemiStatus(1,statusString, templist))
 
+        if (statusString != "complete" && statusString != "cancelled") {
+            TemiCurrentAction.name = "speaking"
+        }
+        else {
+            TemiCurrentAction.name = "none"
+        }
+
     }
     override fun onGoToLocationStatusChanged(location: String, status: String, descriptionId: Int, description: String) {
         val templist = mutableListOf<String>()
         ros2interface.goToSendStatus(TemiStatus(2,status, templist))
+
+        Log.d("goto", status)
+
+        if (status != "complete" && status != "abort") {
+            TemiCurrentAction.name = "goto"
+        }
+        else {
+            TemiCurrentAction.name = "none"
+        }
 
     }
     override fun onMovementStatusChanged(type: String, status: String) {

@@ -48,7 +48,7 @@ class MainActivity :  AppCompatActivity() {
 
         val items = listOf("Guide", "Follow", "Show Services")
 
-        val functionList: List<() -> Unit> = listOf(::locations_menu, ::following_mode, ::locations_menu)
+        val functionList: List<() -> Unit> = listOf(::locations_menu, ::following_mode, ::info_mode)
 
         val icons = listOf(
             R.drawable.follow_icon,
@@ -116,7 +116,6 @@ class MainActivity :  AppCompatActivity() {
             Thread.sleep(350)
             startActivity(guideActivityIntent)
         }
-
     }
 
     private fun following_mode() {
@@ -127,8 +126,18 @@ class MainActivity :  AppCompatActivity() {
             Thread.sleep(350)
             startActivity(followActivityIntent)
         }
-
     }
+
+    private fun info_mode() {
+
+        val infoActivityIntent = Intent(this, MapActivity::class.java)
+
+        GlobalScope.launch {
+            Thread.sleep(350)
+            startActivity(infoActivityIntent)
+        }
+    }
+
 
     /**
      * Setting up all the event listeners
