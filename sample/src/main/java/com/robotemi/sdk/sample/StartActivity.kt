@@ -9,10 +9,10 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import android.view.animation.LinearInterpolator
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.robotemi.sdk.navigation.model.SpeedLevel
 import com.robotemi.sdk.sample.databinding.ActivityStartBinding
 import pl.droidsonroids.gif.GifImageView
 
@@ -42,8 +42,6 @@ class StartActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Put TEMi head on 45 degrees so its easy to detect a human
-        Temi.robot.tiltAngle(45, 0.7F)
 
         //////////////////////////////////////////////////////////////////////////
         //////////////////////////////////////////////////////////////////////////
@@ -94,6 +92,10 @@ class StartActivity : AppCompatActivity() {
             movePupilsToAngle(angle) // Example: move to a random angle
 //            movePupilsToAngle((0..360).random().toFloat()) // Example: move to a random angle
             handler.postDelayed(runnable, 500) // Schedule the runnable to run again in 1 second
+
+        // Put TEMi head on 45 degrees so its easy to detect a human
+        Temi.robot.tiltAngle(45, 0.7F)
+
         }
     }
 
@@ -124,12 +126,15 @@ class StartActivity : AppCompatActivity() {
         val radius = 100f // Radius within which the pupil can move
         val angleRad =angle
 
-        val dx = angleRad*200
+        val dx = angleRad*150
         val dy = 0F
 
         // Animate the left pupil
         val animatorXLeft = ObjectAnimator.ofFloat(leftPupil, "translationX", dx)
         val animatorYLeft = ObjectAnimator.ofFloat(leftPupil, "translationY", dy)
+        animatorXLeft.interpolator = LinearInterpolator()
+        animatorYLeft.interpolator = LinearInterpolator()
+
         val animatorSetLeft = AnimatorSet()
         animatorSetLeft.playTogether(animatorXLeft, animatorYLeft)
         animatorSetLeft.duration = 300
@@ -138,6 +143,9 @@ class StartActivity : AppCompatActivity() {
         // Animate the right pupil
         val animatorXRight = ObjectAnimator.ofFloat(rightPupil, "translationX", dx)
         val animatorYRight = ObjectAnimator.ofFloat(rightPupil, "translationY", dy)
+        animatorXRight.interpolator = LinearInterpolator()
+        animatorYRight.interpolator = LinearInterpolator()
+
         val animatorSetRight = AnimatorSet()
         animatorSetRight.playTogether(animatorXRight, animatorYRight)
         animatorSetRight.duration = 300
@@ -152,7 +160,10 @@ class StartActivity : AppCompatActivity() {
     private fun start_service()
     {
         val mainActivityIntent = Intent(this, MainActivity::class.java)
+
+        mainActivityIntent.putExtra("should_speak", true)
         startActivity(mainActivityIntent)
+        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
     }
 
     companion object {

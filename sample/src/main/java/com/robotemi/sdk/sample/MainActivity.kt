@@ -31,10 +31,23 @@ import kotlinx.coroutines.launch
 
 class MainActivity :  AppCompatActivity() {
 
+    private var speak_: Boolean = true
+
     @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        // Get the flag to speak or not depending from where is the intent to this activity is coming
+        speak_ = intent.getBooleanExtra("should_speak", true)
+
+
+        if (speak_) {
+            Temi.robot.speak(TtsRequest.create("Wie kann ich Ihnen heute helfen", language = TtsRequest.Language.DE_DE, isShowOnConversationLayer = false))
+        }
+        else {
+            Temi.robot.cancelAllTtsRequests()
+        }
 
         // Specify an explicit soft input mode to use for the window
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN)
@@ -43,16 +56,15 @@ class MainActivity :  AppCompatActivity() {
         verifyStoragePermissions(this)
         get_permissions()
 
-
         val bmb = findViewById<BoomMenuButton>(R.id.boommenu_button)
 
-        val items = listOf("Guide", "Follow", "Show Services")
+        val items = listOf("Führung", "Folgen", "Karte")
 
         val functionList: List<() -> Unit> = listOf(::locations_menu, ::following_mode, ::info_mode)
 
         val icons = listOf(
-            R.drawable.follow_icon,
             R.drawable.speak_icon,
+            R.drawable.follow_icon,
             R.drawable.info_icon
         )
 
@@ -90,13 +102,6 @@ class MainActivity :  AppCompatActivity() {
 
         }
 
-        Thread.sleep(200)
-
-        bmb.post {
-            bmb.boom()
-        }
-
-        Temi.robot.speak(TtsRequest.create("Wie kann ich Ihnen heute helfen", language = TtsRequest.Language.DE_DE, isShowOnConversationLayer = false))
 
         val backButton: ImageButton = findViewById(R.id.backButton)
         backButton.setOnClickListener {
@@ -104,38 +109,44 @@ class MainActivity :  AppCompatActivity() {
             // For example, finish the activity
             val backActivityIntent = Intent(this, StartActivity::class.java)
             startActivity(backActivityIntent)
+            overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
         }
+
+        bmb.postDelayed({
+            bmb.boom()
+        }, 650)
+
+        // Keep Temi's head tilted to allow the user easy access to the touchscreen
+        Temi.robot.tiltAngle(45, 0.7F)
+
     }
 
     private fun locations_menu() {
 
         val guideActivityIntent = Intent(this, GuideActivity::class.java)
         guideActivityIntent.putExtra("locations", Temi.robot.locations.toTypedArray())
+        guideActivityIntent.putExtra("should_speak", true)
+        startActivity(guideActivityIntent)
+        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
 
-        GlobalScope.launch {
-            Thread.sleep(350)
-            startActivity(guideActivityIntent)
-        }
     }
 
     private fun following_mode() {
 
         val followActivityIntent = Intent(this, FollowActivity::class.java)
 
-        GlobalScope.launch {
-            Thread.sleep(350)
-            startActivity(followActivityIntent)
-        }
+        startActivity(followActivityIntent)
+        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+
     }
 
     private fun info_mode() {
 
         val infoActivityIntent = Intent(this, MapActivity::class.java)
+        infoActivityIntent.putExtra("origin", "main")
+        startActivity(infoActivityIntent)
+        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
 
-        GlobalScope.launch {
-            Thread.sleep(350)
-            startActivity(infoActivityIntent)
-        }
     }
 
 

@@ -8,6 +8,7 @@ repositories {
         url 'https://oss.sonatype.org/content/repositories/snapshots/'
         url 'https://jcenter.bintray.com/'
     }
+
 }
 
 android {
@@ -68,6 +69,7 @@ dependencies {
     implementation "androidx.cardview:cardview:1.0.0"
     implementation "androidx.recyclerview:recyclerview:1.2.0"
     implementation 'com.google.android.material:material:1.4.0' // or the latest version
+
 
     // temi SDK
     implementation project(':sdk')

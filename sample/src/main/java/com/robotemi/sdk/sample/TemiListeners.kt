@@ -146,7 +146,6 @@ class TemiListeners : Service(), Robot.NlpListener, OnRobotReadyListener,
         return START_STICKY
     }
 
-
     override fun onDestroy() {
 
         Temi.robot.removeOnRequestPermissionResultListener(this)
@@ -238,14 +237,15 @@ class TemiListeners : Service(), Robot.NlpListener, OnRobotReadyListener,
         val templist = mutableListOf<String>()
         ros2interface.goToSendStatus(TemiStatus(2,status, templist))
 
-        Log.d("goto", status)
-
-        if (status != "complete" && status != "abort") {
+        if (status == "start" || status == "calculating" || status == "going") {
             TemiCurrentAction.name = "goto"
         }
-        else {
-            TemiCurrentAction.name = "none"
+        if (status == "complete") {
+            TemiCurrentAction.name = "goto_complete"
         }
+//        else {
+//            TemiCurrentAction.name = "none"
+//        }
 
     }
     override fun onMovementStatusChanged(type: String, status: String) {

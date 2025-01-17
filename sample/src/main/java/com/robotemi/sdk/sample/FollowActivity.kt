@@ -39,13 +39,17 @@ class FollowActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize Temi to follow a Human
-        followInit()
+
 
         //////////////////////////////////////////////////////////////////////////
         //////////////////////////////////////////////////////////////////////////
         binding = ActivityFollowBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        val speak_ = intent.getBooleanExtra("should_speak", true)
+
+        // Initialize Temi to follow a Human
+        followInit(speak_)
 
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
@@ -81,11 +85,14 @@ class FollowActivity : AppCompatActivity() {
         }
     }
 
-    private fun followInit() {
+    private fun followInit(speak: Boolean = true) {
         // Put TEMi head on 45 degrees so its easy to detect a human
         Temi.robot.tiltAngle(45, 0.7F)
         Temi.robot.beWithMe()
-        Temi.robot.speak(TtsRequest.create("Ich werde dir folgen, wohin du auch gehst. Wenn Sie möchten, dass ich aufhöre, berühren Sie bitte den Bildschirm", language = TtsRequest.Language.DE_DE, isShowOnConversationLayer = false))
+        if (speak)
+        {
+            Temi.robot.speak(TtsRequest.create("Ich werde dir folgen, wohin du auch gehst. Wenn Sie möchten, dass ich aufhöre, berühren Sie bitte den Bildschirm", language = TtsRequest.Language.DE_DE, isShowOnConversationLayer = false))
+        }
     }
 
     override fun onStart() {
@@ -130,7 +137,10 @@ class FollowActivity : AppCompatActivity() {
     {
         Temi.robot.stopMovement()
         val mainActivityIntent = Intent(this, MainActivity::class.java)
+        mainActivityIntent.putExtra("should_speak", false)
         startActivity(mainActivityIntent)
+        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+
     }
 
     companion object {

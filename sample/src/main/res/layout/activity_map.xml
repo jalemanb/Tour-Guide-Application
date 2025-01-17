@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -8,27 +9,80 @@
 
     <WebView
         android:id="@+id/webview"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <ImageButton
         android:id="@+id/stopButton"
         android:layout_width="150dp"
         android:layout_height="150dp"
-        android:layout_alignParentStart="true"
-        android:layout_alignParentBottom="true"
         android:layout_margin="16dp"
-        android:background="@drawable/circular_button_red"
+        android:background="@drawable/circular_button"
+        android:padding="20dp"
         android:scaleType="centerInside"
-        android:src="@drawable/stopbtn" />
+        android:src="@drawable/ic_arrow_back"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
 
     <ImageView
         android:id="@+id/person_detected_image_view"
         android:layout_width="200dp"
         android:layout_height="200dp"
         android:scaleType="centerInside"
-        android:layout_alignParentEnd="true"
-        android:layout_alignParentBottom="true"
-        android:src="@drawable/nopersondetectedde_drawio" />
+        android:src="@drawable/nopersondetectedde_drawio"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_margin="16dp"/>
 
-</RelativeLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!--<?xml version="1.0" encoding="utf-8"?>-->
+<!--<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"-->
+<!--    xmlns:app="http://schemas.android.com/apk/res-auto"-->
+<!--    xmlns:tools="http://schemas.android.com/tools"-->
+<!--    android:layout_width="match_parent"-->
+<!--    android:layout_height="match_parent"-->
+<!--    tools:context=".MapActivity">-->
+
+<!--    <WebView-->
+<!--        android:id="@+id/webview"-->
+<!--        android:layout_width="match_parent"-->
+<!--        android:layout_height="match_parent" />-->
+
+<!--    <ImageButton-->
+<!--        android:id="@+id/stopButton"-->
+<!--        android:layout_width="150dp"-->
+<!--        android:layout_height="150dp"-->
+<!--        android:layout_alignParentStart="true"-->
+<!--        android:layout_alignParentBottom="true"-->
+<!--        android:layout_margin="16dp"-->
+<!--        android:background="@drawable/circular_button"-->
+<!--        android:padding="20dp"-->
+<!--        android:scaleType="centerInside"-->
+<!--        android:src="@drawable/ic_arrow_back" />-->
+
+<!--&lt;!&ndash;    <ImageButton&ndash;&gt;-->
+<!--&lt;!&ndash;        android:id="@+id/stopButton"&ndash;&gt;-->
+<!--&lt;!&ndash;        android:layout_width="150dp"&ndash;&gt;-->
+<!--&lt;!&ndash;        android:layout_height="150dp"&ndash;&gt;-->
+<!--&lt;!&ndash;        android:layout_alignParentStart="true"&ndash;&gt;-->
+<!--&lt;!&ndash;        android:layout_alignParentBottom="true"&ndash;&gt;-->
+<!--&lt;!&ndash;        android:layout_margin="16dp"&ndash;&gt;-->
+<!--&lt;!&ndash;        android:background="@drawable/circular_button_red"&ndash;&gt;-->
+<!--&lt;!&ndash;        android:scaleType="centerInside"&ndash;&gt;-->
+<!--&lt;!&ndash;        android:src="@drawable/stopbtn" />&ndash;&gt;-->
+
+<!--    <ImageView-->
+<!--        android:id="@+id/person_detected_image_view"-->
+<!--        android:layout_width="200dp"-->
+<!--        android:layout_height="200dp"-->
+<!--        android:scaleType="centerInside"-->
+<!--        android:layout_alignParentEnd="true"-->
+<!--        android:layout_alignParentBottom="true"-->
+<!--        android:src="@drawable/nopersondetectedde_drawio" />-->
+
+<!--</RelativeLayout>-->

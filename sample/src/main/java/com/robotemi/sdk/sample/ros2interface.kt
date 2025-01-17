@@ -1,10 +1,15 @@
 package com.robotemi.sdk.sample
 
+import android.content.Context
+import android.content.Intent
 import android.util.Log
+import android.widget.Toast
+import androidx.core.content.ContextCompat.startActivity
 import com.google.gson.Gson
 import com.robotemi.sdk.TtsRequest
 import com.robotemi.sdk.navigation.model.Position
 import com.robotemi.sdk.navigation.model.SpeedLevel
+import com.robotemi.sdk.sample.jsonmsgs.Location
 import com.robotemi.sdk.sample.jsonmsgs.TemiCommand
 import com.robotemi.sdk.sample.jsonmsgs.TemiCurrentAction
 import com.robotemi.sdk.sample.jsonmsgs.TemiHumanDetection
@@ -20,6 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
@@ -30,6 +36,7 @@ object ros2interface {
     // Websocket client
     var ws_getloc: WebSocketCom
     var ws_speak: WebSocketCom
+    var ws_show: WebSocketCom
     var ws_goto: WebSocketCom
     var ws_turnby: WebSocketCom
     var ws_tiltangle: WebSocketCom
@@ -54,8 +61,9 @@ object ros2interface {
     private var future_map: ScheduledFuture<*>
     private var future_position: ScheduledFuture<*>
     private var future_logger: ScheduledFuture<*>
-//    private val serverIP = "10.42.0.1"; // Control the temi robot from pc
-    private val serverIP = "10.0.0.1"; // Control the temi robot from edge device
+    private val serverIP = "10.42.0.1"; // Control the temi robot from pc
+//    private val serverIP = "10.0.0.1"; // Control the temi robot from edge device
+
 
     init {
         // setting up requied scopes for synchronous tasks
@@ -96,16 +104,21 @@ object ros2interface {
                         val commandObj = Gson().fromJson(msg, TemiCommand::class.java)
                         Log.d("WebSocket", "Command Speak Received")
                         // Implement Switch stamente for each Robot Capability
-                        when (commandObj.command) {
-                            1 -> speak_cmd(commandObj)
-                            else -> {
-                                Log.d("WebSocket", "Command Sent is: ${commandObj.command}")
-                            }
+
+                        if(!commandObj.flag3)
+                        {
+                            speak_cmd(commandObj)
                         }
+                        else
+                        {
+                            Temi.robot.cancelAllTtsRequests()
+                        }
+
                     }
                 }
             }
         }
+
 
         ws_goto = object : WebSocketCom("ws://$serverIP:8762", 5000) {
             override fun onCommand(msg:String) {
@@ -114,6 +127,7 @@ object ros2interface {
                         val commandObj = Gson().fromJson(msg, TemiCommand::class.java)
                         Log.d("WebSocket", "Command Goto Received")
                         // Implement Switch stamente for each Robot Capability
+
                         if(!commandObj.flag3)
                         {
                             if(commandObj.flag0)
@@ -208,6 +222,25 @@ object ros2interface {
             override fun onCommand(msg:String) { }
         }
 
+        ws_show = object : WebSocketCom("ws://$serverIP:8771", 5000) {
+            override fun onCommand(msg:String) {
+                GlobalScope.launch(Dispatchers.IO) {
+                    mutex.withLock {
+                        val commandObj = Gson().fromJson(msg, TemiCommand::class.java)
+                        Log.d("WebSocket", "Command Show Received")
+                        // Implement Switch stamente for each Robot Capability
+
+                        if(commandObj.command == 11)
+                        {
+                            show_cmd(commandObj)
+                        }
+//                        show_cmd(commandObj)
+
+                    }
+                }
+            }
+        }
+
         future_position = positionExecutor.scheduleAtFixedRate({
             positionScope.launch {
                 positionMutex.withLock {
@@ -223,10 +256,16 @@ object ros2interface {
                 mapMutex.withLock {
                     // Get the current map data and send it to the temi_bridge
                     val currentMap = Temi.robot.getMapData()
+                    val mapLocations = mutableListOf<Location>()
+
+                    for (location in currentMap!!.locations) {
+                        mapLocations.add(Location(name = location.layerId, x = location.layerPoses!![0].x, y = location.layerPoses!![0].y, theta = location.layerPoses!![0].theta))
+                    }
+
                     val temiMapJson = gson.toJson(
                         TemiMap(currentMap!!.mapInfo.height, currentMap.mapInfo.width,
                             currentMap.mapInfo.originX,  currentMap.mapInfo.originY,
-                            currentMap.mapInfo.resolution, currentMap.mapImage.data)
+                            currentMap.mapInfo.resolution, currentMap.mapImage.data, mapLocations)
                     )
                     ws_mapserver.getWebSocket().sendText(temiMapJson)
                 }
@@ -271,11 +310,18 @@ object ros2interface {
         ws_speak.getWebSocket().sendText(jsonString)
     }
 
+    fun showSendStatus(status: TemiStatus)
+    {
+        val jsonString = gson.toJson(status)
+        ws_show.getWebSocket().sendText(jsonString)
+    }
+
     fun goToSendStatus(status: TemiStatus)
     {
         val jsonString = gson.toJson(status)
         ws_goto.getWebSocket().sendText(jsonString)
     }
+
 
     fun updatePosition(position: Position)
     {
@@ -314,6 +360,7 @@ object ros2interface {
         // Stop web sockets
         ws_speak.close()
         ws_getloc.close()
+        ws_show.close()
         ws_goto.close()
         ws_turnby.close()
         ws_tiltangle.close()
@@ -341,22 +388,58 @@ object ros2interface {
     {
         Temi.robot.stopMovement()
     }
+
     private fun speak_cmd(cmd: TemiCommand) {
-        Temi.robot.speak(TtsRequest.create(cmd.text!!, language = TtsRequest.Language.EN_US, isShowOnConversationLayer = false))
+        Temi.robot.speak(TtsRequest.create(cmd.text!!, language = TtsRequest.Language.DE_DE, isShowOnConversationLayer = false))
     }
     private fun goto_cmd(cmd: TemiCommand) {
-        Temi.robot.goTo(cmd.text!!, backwards = cmd.flag1, noBypass = false, SpeedLevel.MEDIUM)
+        Temi.robot.goTo(cmd.text!!, backwards = cmd.flag1, noBypass = false, SpeedLevel.SLOW)
     }
     private fun gotopos_cmd(cmd: TemiCommand) {
         val position: Position = Position(x = cmd.x!!, y = cmd.y!!, yaw = cmd.angle!!)
-        Temi.robot.goToPosition( position, backwards = cmd.flag1, noBypass = false, speedLevel = SpeedLevel.MEDIUM)
+        Temi.robot.goToPosition( position, backwards = cmd.flag1, noBypass = false, speedLevel = SpeedLevel.SLOW)
     }
     private fun joy_cmd(cmd: TemiCommand) {
-        Temi.robot.skidJoy(cmd.x!!,cmd.y!!, false)
+        Temi.robot.skidJoy(cmd.x!!,cmd.y!!, true)
     }
     private fun turnby_cmd(cmd: TemiCommand) {
         Temi.robot.turnBy(cmd.angle!!.toInt(), 1.0F)
     }
+
+    private fun show_cmd(cmd: TemiCommand) {
+
+        showSendStatus(TemiStatus(11, "started", mutableListOf<String>()))
+
+        val baseActivity = MyApplication.getCurrentActivity()
+
+        val baseActivityName = baseActivity!!.javaClass.simpleName
+
+        Log.d("ACTIVITY_1", baseActivityName)
+
+        // First go to the show message Activity to Display something
+        val showActivityIntent = Intent(baseActivity, ShowActivity::class.java)
+        showActivityIntent.putExtra("SHOW_MESSAGE", cmd.text)
+        baseActivity.startActivity(showActivityIntent)
+
+        for (i in 0 until cmd.x!!.toInt()) {
+            Thread.sleep(1000L)
+            showSendStatus(TemiStatus(11, "pending", mutableListOf<String>()))
+        }
+
+        // Then go back to display what was previously displayed
+        val showActivity = MyApplication.getCurrentActivity()
+        val baseActivityIntent = Intent(showActivity, baseActivity.javaClass)
+        baseActivityIntent.putExtra("should_speak", false)
+        if (baseActivityName == "GuideActivity")
+        {
+            baseActivityIntent.putExtra("locations", Temi.robot.locations.toTypedArray())
+        }
+
+        showActivity!!.startActivity(baseActivityIntent)
+        showSendStatus(TemiStatus(11, "complete", mutableListOf<String>()))
+
+    }
+
     private fun getloc_cmd(cmd: TemiCommand) {
         val locations = Temi.robot.locations.toMutableList()
         // The getloc Action is Labeled as 0
